@@ -6,7 +6,7 @@ function Level() {
 
   useEffect(() => {
     async function fetchData() {
-      const { data } = await supabase.from("your_table_name").select("*");
+      const { data } = await supabase.from("user_level").select("*");
       setData(data);
     }
 
