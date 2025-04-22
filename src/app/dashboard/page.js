@@ -26,7 +26,6 @@ export default function Dashboard() {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       
-      // Force a router refresh to update the session
       router.refresh()
       router.push('/login')
     } catch (error) {
@@ -35,23 +34,51 @@ export default function Dashboard() {
   }
 
   if (!user) {
-    return <div>Loading...</div>
+    return (
+      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+        <div className="animate-pulse text-[var(--color-fourth)] text-xl">Loading...</div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Trivia on Tap</h1>
-            <p className="text-gray-600 mb-4">You are logged in as: {user.email}</p>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              Logout
-            </button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] flex flex-col items-center justify-center relative">
+      {/* Profile Section */}
+      <div className="absolute top-6 left-6 flex items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+        <div className="bg-[var(--color-tertiary)] p-3 rounded-full shadow-md hover:bg-[var(--color-fourth)] transition-all duration-300 transform hover:scale-105">
+          <img src="/icons/profile.svg" alt="Profile" className="w-7 h-7" />
+        </div>
+        <div className="text-[var(--color-fourth)]">
+          <p className="font-semibold text-lg">{user.email}</p>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
+        <div className="text-center space-y-4 mb-12">
+          <h1 className="text-4xl font-bold text-[var(--color-fourth)]">Welcome to Trivia on Tap</h1>
+          <p className="text-[var(--color-fourth)]/80 text-lg">Test your knowledge and have fun!</p>
+        </div>
+
+        <div className="flex flex-col items-center space-y-6 w-full">
+          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+            <span className="text-xl">🎮</span>
+            <span>Single Player Mode</span>
+          </button>
+          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+            <span className="text-xl">👥</span>
+            <span>Multiplayer Mode</span>
+          </button>
+          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+            <span className="text-xl">📚</span>
+            <span>Tutorial</span>
+          </button>
         </div>
       </div>
     </div>

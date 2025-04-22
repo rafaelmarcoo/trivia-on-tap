@@ -30,11 +30,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 bg-white">
+    <div className="min-h-screen flex flex-col items-center p-6 bg-[var(--color-primary)]">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-indigo-700">Trivia on Tap</h1>
-          <p className="text-gray-600">have a beer have a trivia</p>
+          <h1 className="text-2xl font-bold text-[var(--color-fourth)]">Trivia on Tap</h1>
+          <p className="text-[var(--color-fourth)]/80">have a beer have a trivia</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
@@ -46,7 +46,7 @@ export default function Login() {
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="email" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Email
               </label>
               <input
@@ -54,7 +54,7 @@ export default function Login() {
                 name="email"
                 type="email"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -62,7 +62,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="password" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Password
               </label>
               <input
@@ -70,7 +70,7 @@ export default function Login() {
                 name="password"
                 type="password"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +81,7 @@ export default function Login() {
           <div>
             <button
               type="submit"
-              className="w-full py-2 px-4 bg-gray-300 hover:bg-gray-400 rounded-md text-gray-800 font-medium transition-colors"
+              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02]"
             >
               Login
             </button>
@@ -89,8 +89,8 @@ export default function Login() {
         </form>
 
         <div className="text-center text-sm">
-          <span className="text-gray-600">No account? </span>
-          <Link href="/register" className="text-yellow-600 hover:text-yellow-700">
+          <span className="text-[var(--color-fourth)]/80">No account? </span>
+          <Link href="/register" className="text-[var(--color-tertiary)] hover:text-[var(--color-fourth)] transition-colors">
             Sign up now!
           </Link>
         </div>

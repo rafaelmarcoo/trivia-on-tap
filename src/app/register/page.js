@@ -41,10 +41,10 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 bg-white">
+    <div className="min-h-screen flex flex-col items-center p-6 bg-[var(--color-primary)]">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-indigo-700">Join TriviaOnTap</h1>
+          <h1 className="text-2xl font-bold text-[var(--color-fourth)]">Join TriviaOnTap</h1>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleRegister}>
@@ -56,7 +56,7 @@ export default function Register() {
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="username" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Username
               </label>
               <input
@@ -64,7 +64,7 @@ export default function Register() {
                 name="username"
                 type="text"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -72,7 +72,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="email" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Email
               </label>
               <input
@@ -80,7 +80,7 @@ export default function Register() {
                 name="email"
                 type="email"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -88,7 +88,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="password" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Password
               </label>
               <input
@@ -96,7 +96,7 @@ export default function Register() {
                 name="password"
                 type="password"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -104,7 +104,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-indigo-700 font-medium mb-2">
+              <label htmlFor="confirmPassword" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Confirm Password
               </label>
               <input
@@ -112,7 +112,7 @@ export default function Register() {
                 name="confirmPassword"
                 type="password"
                 required
-                className="w-full px-3 py-2 bg-yellow-50 border-0 rounded-md"
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -123,7 +123,7 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              className="w-full py-2 px-4 bg-gray-300 hover:bg-gray-400 rounded-md text-gray-800 font-medium transition-colors"
+              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02]"
             >
               Sign up
             </button>
@@ -131,8 +131,8 @@ export default function Register() {
         </form>
 
         <div className="text-center text-sm">
-          <span className="text-gray-600">Already have an account? </span>
-          <Link href="/login" className="text-yellow-600 hover:text-yellow-700">
+          <span className="text-[var(--color-fourth)]/80">Already have an account? </span>
+          <Link href="/login" className="text-[var(--color-tertiary)] hover:text-[var(--color-fourth)] transition-colors">
             Log in now!
           </Link>
         </div>
