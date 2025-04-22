@@ -1,19 +1,22 @@
-import supabase from "./supabase-config";
-import { useState } from "react";
+import React from "react";
 
-function display() {
+const LevelingSystem = () => {
+  const winning = true; // This should be replaced with actual logic to determine if the user has won
+  const userLevel = 0;
+
   const [Level, setLevel] = useState([]);
   const [newLevel, setNewLevel] = useState();
+  setNewLevel = 50;
+  const id = 0;
 
-  const addLevel = async () => {
+  const updateLevel = async () => {
     const newLevelData = {
-      user: "From Login",
       level: newLevel,
     };
     const { data, error } = await supabase
       .from("user_level")
-      .insert([newLevelData])
-      .single();
+      .updateLevel([newLevelData])
+      .eq("id", id);
 
     if (error) {
       console.log("Error adding Level:", error);
@@ -22,15 +25,14 @@ function display() {
       setNewLevel("");
     }
   };
-
   return (
     <div>
       <h1>Level</h1>
       <div>
         <input
           type="number"
-          placeholder="Level..."
-          onChange={(e) => setNewLevel(e.target.value)}
+          placeholder="id number..."
+          onChange={(e) => id(e.target.value)}
         />
         <button
           style={{
@@ -48,6 +50,6 @@ function display() {
       </div>
     </div>
   );
-}
+};
 
-export default display;
+export default LevelingSystem;
