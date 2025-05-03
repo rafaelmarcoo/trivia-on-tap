@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
 import { generateTriviaQuestion } from '@/utils/openai';
 
 export default function SinglePlayerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userLevel = searchParams.get('level') || 1;
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [gameState, setGameState] = useState('selection'); // 'selection' | 'playing' | 'summary'
   const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -44,7 +46,7 @@ export default function SinglePlayerPage() {
     setTimeLeft(30);
     setScore(0);
     try {
-      const question = await generateTriviaQuestion(selectedCategories);
+      const question = await generateTriviaQuestion(selectedCategories, userLevel);
       setCurrentQuestion(question);
       setGameState('playing');
     } catch (error) {
@@ -66,7 +68,7 @@ export default function SinglePlayerPage() {
     setError(null);
     setTimeLeft(30);
     try {
-      const question = await generateTriviaQuestion(selectedCategories);
+      const question = await generateTriviaQuestion(selectedCategories, userLevel);
       setCurrentQuestion(question);
     } catch (error) {
       console.error('Error generating next question:', error);

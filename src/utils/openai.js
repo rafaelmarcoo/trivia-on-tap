@@ -2,10 +2,10 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // This is needed for client-side usage
+  dangerouslyAllowBrowser: true
 });
 
-export async function generateTriviaQuestion(categories) {
+export async function generateTriviaQuestion(categories, level) {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -18,7 +18,7 @@ export async function generateTriviaQuestion(categories) {
             "question": string,
             "options": string[] (only for multiple-choice and true-false),
             "correctAnswer": string,
-            "explanation": string (optional)
+            "explanation": string
           }
 
           For multiple-choice: Provide 4 options.
@@ -30,7 +30,7 @@ export async function generateTriviaQuestion(categories) {
         },
         {
           role: "user",
-          content: `Generate a trivia question from these categories: ${categories.join(', ')}. The question should be challenging but fair. Randomly select one of the question types.`
+          content: `Generate a trivia question from these categories: ${categories.join(', ')}. The question should be challenging but fair for a user at level ${level}. Randomly select one of the question types.`
         }
       ],
       response_format: { type: "json_object" }
