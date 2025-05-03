@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getSupabase, useAutoLogout } from '@/utils/supabase'
@@ -13,32 +13,32 @@ export default function Dashboard() {
   
   useAutoLogout()
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
+  const getUser = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+    } else {
+      setUser(user)
+      
+      // Fetch user level and username from the user table
+      const { data: userData, error } = await supabase
+        .from('user')
+        .select('user_name, user_level')
+        .eq('auth_id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching user data:', error)
       } else {
-        setUser(user)
-        
-        // Fetch user level and username from the user table
-        const { data: userData, error } = await supabase
-          .from('user')
-          .select('user_name, user_level')
-          .eq('auth_id', user.id)
-          .single()
-        
-        if (error) {
-          console.error('Error fetching user data:', error)
-        } else {
-          setUserName(userData?.user_name || '')
-          setUserLevel(userData?.user_level || 1)
-        }
+        setUserName(userData?.user_name || '')
+        setUserLevel(userData?.user_level || 1)
       }
     }
-
-    getUser()
   }, [router, supabase])
+
+  useEffect(() => {
+    getUser()
+  }, [getUser])
 
   const handleLogout = async () => {
     try {

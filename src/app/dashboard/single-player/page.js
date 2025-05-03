@@ -1,15 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { getSupabase, useAutoLogout } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
-import { generateTriviaQuestion } from '@/utils/openai';
+import { generateTriviaQuestion } from '@/utils/trivia';
 
 export default function SinglePlayerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userLevel = searchParams.get('level') || 1;
+  const supabase = getSupabase();
+  
+  useAutoLogout();
+
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [gameState, setGameState] = useState('selection'); // 'selection' | 'playing' | 'summary'
   const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -18,6 +23,21 @@ export default function SinglePlayerPage() {
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
+
+  const handleNextQuestion = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    setTimeLeft(30);
+    try {
+      const question = await generateTriviaQuestion(selectedCategories, userLevel);
+      setCurrentQuestion(question);
+    } catch (error) {
+      console.error('Error generating next question:', error);
+      setError('Failed to generate next question. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCategories, userLevel]);
 
   useEffect(() => {
     let timer;
@@ -60,21 +80,6 @@ export default function SinglePlayerPage() {
   const handleAnswer = (isCorrect) => {
     if (isCorrect) {
       setScore(prev => prev + 1);
-    }
-  };
-
-  const handleNextQuestion = async () => {
-    setIsLoading(true);
-    setError(null);
-    setTimeLeft(30);
-    try {
-      const question = await generateTriviaQuestion(selectedCategories, userLevel);
-      setCurrentQuestion(question);
-    } catch (error) {
-      console.error('Error generating next question:', error);
-      setError('Failed to generate next question. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
