@@ -26,7 +26,8 @@ export default function Register() {
         options: {
           data: {
             username: username,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       })
       

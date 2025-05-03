@@ -5,6 +5,8 @@ import { getSupabase } from '@/utils/supabase'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
+  const [userLevel, setUserLevel] = useState(null)
+  const [userName, setUserName] = useState('')
   const router = useRouter()
   const supabase = getSupabase()
 
@@ -15,6 +17,20 @@ export default function Dashboard() {
         router.push('/login')
       } else {
         setUser(user)
+        
+        // Fetch user level and username from the user table
+        const { data: userData, error } = await supabase
+          .from('user')
+          .select('user_name, user_level')
+          .eq('auth_id', user.id)
+          .single()
+        
+        if (error) {
+          console.error('Error fetching user data:', error)
+        } else {
+          setUserName(userData?.user_name || '')
+          setUserLevel(userData?.user_level || 1)
+        }
       }
     }
 
@@ -49,16 +65,17 @@ export default function Dashboard() {
           <img src="/icons/profile.svg" alt="Profile" className="w-7 h-7" />
         </div>
         <div className="text-[var(--color-fourth)]">
-          <p className="font-semibold text-lg">{user.email}</p>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
-          >
-            Logout
-          </button>
+          <p className="font-semibold text-lg">{userName}</p>
+          <p className="text-sm">Level {userLevel}</p>
         </div>
+        <button
+          onClick={handleLogout}
+          className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
+        >
+          Logout
+        </button>
       </div>
-
+      
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
