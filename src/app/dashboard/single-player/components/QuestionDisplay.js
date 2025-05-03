@@ -14,6 +14,7 @@ export default function QuestionDisplay({
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [userInput, setUserInput] = useState('');
+  const [isCorrect, setIsCorrect] = useState(null);
 
   const handleAnswer = (answer) => {
     if (isAnswered) return;
@@ -26,13 +27,22 @@ export default function QuestionDisplay({
   const handleInputAnswer = (e) => {
     e.preventDefault();
     if (isAnswered) return;
-    
-    const normalizedUserAnswer = userInput.trim().toLowerCase();
-    const normalizedCorrectAnswer = correctAnswer.trim().toLowerCase();
-    
+
+    let correct = false;
+    if (type === 'math') {
+      const userNum = parseFloat(userInput.trim());
+      const correctNum = parseFloat(correctAnswer.trim());
+      correct = Math.abs(userNum - correctNum) < 0.01; // Accept small float errors
+    } else {
+      const userAns = userInput.trim().toLowerCase().replace(/\.$/, '');
+      const correctAns = correctAnswer.trim().toLowerCase().replace(/\.$/, '');
+      correct = userAns === correctAns;
+    }
+
     setSelectedAnswer(userInput);
     setIsAnswered(true);
-    onAnswer(normalizedUserAnswer === normalizedCorrectAnswer);
+    setIsCorrect(correct);
+    onAnswer(correct);
   };
 
   const handleNext = () => {
@@ -101,7 +111,13 @@ export default function QuestionDisplay({
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               disabled={isAnswered}
-              className="w-full p-4 rounded-lg border-2 border-[var(--color-fourth)] bg-[var(--color-primary)]"
+              className={`w-full p-4 rounded-lg border-2 bg-[var(--color-primary)] ${
+                isAnswered
+                  ? isCorrect
+                    ? 'border-green-500'
+                    : 'border-red-500'
+                  : 'border-[var(--color-fourth)]'
+              }`}
               placeholder={type === 'math' ? 'Enter your answer (numbers only)' : 'Enter your answer'}
             />
             <button
@@ -129,6 +145,14 @@ export default function QuestionDisplay({
 
       {isAnswered && (
         <div className="space-y-4">
+          <div>
+            {isCorrect === true && (
+              <div className="text-green-700 font-bold">Correct!</div>
+            )}
+            {isCorrect === false && (
+              <div className="text-red-700 font-bold">Incorrect. The correct answer was: {correctAnswer}</div>
+            )}
+          </div>
           {explanation && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-800">{explanation}</p>
