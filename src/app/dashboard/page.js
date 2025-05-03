@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSupabase } from '@/utils/supabase'
+import { getSupabase, useAutoLogout } from '@/utils/supabase'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('')
   const router = useRouter()
   const supabase = getSupabase()
+  
+  useAutoLogout()
 
   useEffect(() => {
     const getUser = async () => {

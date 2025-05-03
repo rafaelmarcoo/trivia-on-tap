@@ -14,4 +14,25 @@ export const getSupabase = () => {
     supabase = createClient()
   }
   return supabase
-} 
+}
+
+export const useAutoLogout = () => {
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      try {
+        const supabase = getSupabase()
+        await supabase.auth.signOut()
+      } catch (error) {
+        console.error('Error during auto logout:', error)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
+}
+
+export default getSupabase 
