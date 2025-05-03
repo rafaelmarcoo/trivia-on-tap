@@ -169,9 +169,11 @@ export default function SinglePlayerPage() {
             </div>
           ) : currentQuestion ? (
             <QuestionDisplay
+              type={currentQuestion.type}
               question={currentQuestion.question}
               options={currentQuestion.options}
               correctAnswer={currentQuestion.correctAnswer}
+              explanation={currentQuestion.explanation}
               onAnswer={handleAnswer}
               onNextQuestion={handleNextQuestion}
             />
