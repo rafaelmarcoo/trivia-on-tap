@@ -77,7 +77,7 @@ const LevelingSystem = () => {
       {currentLevel !== null && (
         <div style={{ marginTop: "15px" }}>
           <p>
-            {username}'s Current Level: <strong>{currentLevel}</strong>
+            {username}&apos;s Current Level: <strong>{currentLevel}</strong>
           </p>
           <button onClick={() => updateLevel(true)}>Increase</button>
           <button

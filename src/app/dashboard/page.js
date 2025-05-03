@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { getSupabase, useAutoLogout } from '@/utils/supabase'
 
 export default function Dashboard() {
@@ -37,7 +38,7 @@ export default function Dashboard() {
     }
 
     getUser()
-  }, [router])
+  }, [router, supabase])
 
   const handleLogout = async () => {
     try {
@@ -64,7 +65,7 @@ export default function Dashboard() {
       {/* Profile Section */}
       <div className="absolute top-6 left-6 flex items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
         <div className="bg-[var(--color-tertiary)] p-3 rounded-full shadow-md hover:bg-[var(--color-fourth)] transition-all duration-300 transform hover:scale-105">
-          <img src="/icons/profile.svg" alt="Profile" className="w-7 h-7" />
+          <Image src="/icons/profile.svg" alt="Profile" width={28} height={28} />
         </div>
         <div className="text-[var(--color-fourth)]">
           <p className="font-semibold text-lg">{userName}</p>

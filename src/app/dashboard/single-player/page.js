@@ -29,7 +29,7 @@ export default function SinglePlayerPage() {
       handleNextQuestion();
     }
     return () => clearInterval(timer);
-  }, [gameState, timeLeft, isLoading]);
+  }, [gameState, timeLeft, isLoading, handleNextQuestion]);
 
   const handleCategoryToggle = (category) => {
     setSelectedCategories(prev => {
