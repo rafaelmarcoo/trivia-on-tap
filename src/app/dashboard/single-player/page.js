@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getSupabase, useAutoLogout } from '@/utils/supabase';
+import { useAutoLogout } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
 import { generateTriviaQuestion } from '@/utils/openai';
 
-export default function SinglePlayerPage() {
+function SinglePlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userLevel = searchParams.get('level') || 1;
-  const supabase = getSupabase();
   
   useAutoLogout();
 
@@ -188,5 +187,17 @@ export default function SinglePlayerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SinglePlayerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+        <div className="animate-pulse text-[var(--color-fourth)] text-xl">Loading...</div>
+      </div>
+    }>
+      <SinglePlayerGame />
+    </Suspense>
   );
 }
