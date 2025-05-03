@@ -9,10 +9,25 @@ import { generateTriviaQuestion } from '@/utils/openai';
 export default function SinglePlayerPage() {
   const router = useRouter();
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [gameState, setGameState] = useState('selection'); // 'selection' | 'playing'
+  const [gameState, setGameState] = useState('selection'); // 'selection' | 'playing' | 'summary'
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [gameSummary, setGameSummary] = useState(null);
+
+  useEffect(() => {
+    let timer;
+    if (gameState === 'playing' && timeLeft > 0 && !isLoading) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      handleNextQuestion();
+    }
+    return () => clearInterval(timer);
+  }, [gameState, timeLeft, isLoading]);
 
   const handleCategoryToggle = (category) => {
     setSelectedCategories(prev => {
@@ -25,13 +40,16 @@ export default function SinglePlayerPage() {
 
   const startGame = async () => {
     setIsLoading(true);
+    setError(null);
+    setTimeLeft(30);
+    setScore(0);
     try {
       const question = await generateTriviaQuestion(selectedCategories);
       setCurrentQuestion(question);
       setGameState('playing');
     } catch (error) {
       console.error('Error starting game:', error);
-      // TODO: Handle error appropriately
+      setError('Failed to start the game. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -45,15 +63,26 @@ export default function SinglePlayerPage() {
 
   const handleNextQuestion = async () => {
     setIsLoading(true);
+    setError(null);
+    setTimeLeft(30);
     try {
       const question = await generateTriviaQuestion(selectedCategories);
       setCurrentQuestion(question);
     } catch (error) {
       console.error('Error generating next question:', error);
-      // TODO: Handle error appropriately
+      setError('Failed to generate next question. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const endGame = () => {
+    setGameSummary({
+      score,
+      totalQuestions: score + (currentQuestion ? 1 : 0),
+      categories: selectedCategories
+    });
+    setGameState('summary');
   };
 
   return (
@@ -97,19 +126,42 @@ export default function SinglePlayerPage() {
             </button>
           </div>
         </>
+      ) : gameState === 'summary' ? (
+        <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl mb-4 text-[var(--color-fourth)]">Game Summary</h2>
+          <div className="space-y-4">
+            <p className="text-[var(--color-fourth)]">Score: {gameSummary.score} / {gameSummary.totalQuestions}</p>
+            <p className="text-[var(--color-fourth)]">Categories: {gameSummary.categories.join(', ')}</p>
+            <button
+              onClick={() => setGameState('selection')}
+              className="w-full py-3 px-6 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
+            >
+              Play Again
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl text-[var(--color-fourth)]">
-              Score: {score}
-            </h2>
+            <div>
+              <h2 className="text-2xl text-[var(--color-fourth)]">
+                Score: {score}
+              </h2>
+              <p className="text-[var(--color-fourth)]">Time left: {timeLeft}s</p>
+            </div>
             <button
-              onClick={() => setGameState('selection')}
+              onClick={endGame}
               className="px-4 py-2 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-md"
             >
               End Game
             </button>
           </div>
+
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+              {error}
+            </div>
+          )}
 
           {isLoading ? (
             <div className="text-center py-8">
