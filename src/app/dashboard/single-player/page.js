@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getSupabase, useAutoLogout } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
-import { generateTriviaQuestion } from '@/utils/trivia';
+import { generateTriviaQuestion } from '@/utils/openai';
 
 export default function SinglePlayerPage() {
   const router = useRouter();
