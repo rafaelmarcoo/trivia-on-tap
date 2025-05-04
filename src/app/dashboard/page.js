@@ -62,22 +62,34 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] flex flex-col items-center justify-center relative">
+      
       {/* Profile Section */}
-      <div className="absolute top-6 left-6 flex items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
-        <div className="bg-[var(--color-tertiary)] p-3 rounded-full shadow-md hover:bg-[var(--color-fourth)] transition-all duration-300 transform hover:scale-105">
+      <div
+        onClick={() => router.push('/dashboard/user-profile')}
+        className="absolute top-6 left-6 flex items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+      >
+        {/* Profile Icon */}
+        <div className="bg-[var(--color-tertiary)] p-3 rounded-full shadow-md transition-all duration-300 transform hover:bg-[var(--color-fourth)] hover:scale-105">
           <Image src="/icons/profile.svg" alt="Profile" width={28} height={28} />
         </div>
+  
+        {/* User Info */}
         <div className="text-[var(--color-fourth)]">
           <p className="font-semibold text-lg">{userName}</p>
           <p className="text-sm">Level {userLevel}</p>
         </div>
+  
+        {/* Logout Button */}
         <button
-          onClick={handleLogout}
-          className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
+          onClick={(e) => {
+            handleLogout()
+          }}
+          className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200 ml-auto"
         >
           Logout
         </button>
-      </div>
+    </div>
+  
       
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
