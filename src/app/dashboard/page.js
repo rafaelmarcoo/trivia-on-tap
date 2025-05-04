@@ -1,44 +1,48 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { getSupabase } from '@/utils/supabase'
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getSupabase } from "@/utils/supabase";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null)
-  const router = useRouter()
-  const supabase = getSupabase()
+  const [user, setUser] = useState(null);
+  const router = useRouter();
+  const supabase = getSupabase();
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/login')
+        router.push("/login");
       } else {
-        setUser(user)
+        setUser(user);
       }
-    }
+    };
 
-    getUser()
-  }, [router])
+    getUser();
+  }, [router]);
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      router.refresh()
-      router.push('/login')
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      router.refresh();
+      router.push("/login");
     } catch (error) {
-      console.error('Error logging out:', error.message)
+      console.error("Error logging out:", error.message);
     }
-  }
+  };
 
   if (!user) {
     return (
       <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
-        <div className="animate-pulse text-[var(--color-fourth)] text-xl">Loading...</div>
+        <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+          Loading...
+        </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -62,13 +66,17 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
-          <h1 className="text-4xl font-bold text-[var(--color-fourth)]">Welcome to Trivia on Tap</h1>
-          <p className="text-[var(--color-fourth)]/80 text-lg">Test your knowledge and have fun!</p>
+          <h1 className="text-4xl font-bold text-[var(--color-fourth)]">
+            Welcome to Trivia on Tap
+          </h1>
+          <p className="text-[var(--color-fourth)]/80 text-lg">
+            Test your knowledge and have fun!
+          </p>
         </div>
 
         <div className="flex flex-col items-center space-y-6 w-full">
-          <button 
-            onClick={() => router.push('/dashboard/single-player')}
+          <button
+            onClick={() => router.push("/dashboard/single-player")}
             className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
           >
             <span className="text-xl">🎮</span>
@@ -78,12 +86,15 @@ export default function Dashboard() {
             <span className="text-xl">👥</span>
             <span>Multiplayer Mode</span>
           </button>
-          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+          <button
+            onClick={() => router.push("/dashboard/tutorial")}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+          >
             <span className="text-xl">📚</span>
             <span>Tutorial</span>
           </button>
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}
