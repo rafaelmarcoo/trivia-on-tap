@@ -181,6 +181,7 @@ function SinglePlayerGame() {
               explanation={currentQuestion.explanation}
               onAnswer={handleAnswer}
               onNextQuestion={handleNextQuestion}
+              isLastQuestion={currentQuestionIndex === questions.length - 1}
             />
           ) : null}
         </div>
