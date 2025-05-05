@@ -9,7 +9,8 @@ export default function QuestionDisplay({
   correctAnswer, 
   explanation,
   onAnswer, 
-  onNextQuestion 
+  onNextQuestion,
+  isLastQuestion = false
 }) {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -162,7 +163,7 @@ export default function QuestionDisplay({
             onClick={handleNext}
             className="w-full py-3 px-6 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
           >
-            Next Question
+            {isLastQuestion ? 'See Results' : 'Next Question'}
           </button>
         </div>
       )}
