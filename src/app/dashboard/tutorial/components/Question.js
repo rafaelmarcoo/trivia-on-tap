@@ -28,10 +28,13 @@ export default function QuestionDisplay({
 
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-[var(--color-fourth)]">
-        {question}
+      <h3 className="text-xl font-semibold text-red-500">
+        THE QUESTION WILL BE DISPLAYED HERE
       </h3>
-
+      <h2 className="text-xl mb-4 text-red-500 text-center">
+        SELECT WHAT YOU THINK IS THE CORRECT ANSWER BELOW
+        <p className="text-4xl text-center mb-8 text-red-500">↓</p>
+      </h2>
       <div className="grid grid-cols-1 gap-3">
         {options.map((option, index) => (
           <button
@@ -52,7 +55,6 @@ export default function QuestionDisplay({
           </button>
         ))}
       </div>
-
       {isAnswered && (
         <button
           onClick={handleNext}
