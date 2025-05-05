@@ -5,20 +5,24 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true
 });
 
-export async function generateTriviaQuestion(categories, level) {
+export async function generateTriviaQuestions(categories, level, count = 20) {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4.1-2025-04-14",
       messages: [
         {
           role: "system",
-          content: `You are a trivia question generator. Always respond ONLY with a valid JSON object matching this structure:
+          content: `You are a trivia question generator. Always respond ONLY with a valid JSON object containing an array of questions matching this structure:
           {
-            "type": "multiple-choice" | "true-false" | "one-word" | "math",
-            "question": string,
-            "options": string[] (only for multiple-choice and true-false),
-            "correctAnswer": string,
-            "explanation": string
+            "questions": [
+              {
+                "type": "multiple-choice" | "true-false" | "one-word" | "math",
+                "question": string,
+                "options": string[] (only for multiple-choice and true-false),
+                "correctAnswer": string,
+                "explanation": string
+              }
+            ]
           }
 
           For multiple-choice: Provide 4 options.
@@ -26,49 +30,57 @@ export async function generateTriviaQuestion(categories, level) {
           For one-word: No options needed, just the correct answer.
           For math: No options needed, provide the numerical answer as a string.
 
-          Respond only with a JSON object, no extra text. The word 'JSON' must appear in your response instructions.`
+          Generate ${count} diverse questions. Mix different types of questions and ensure they are challenging but fair for level ${level}.
+          Respond only with a JSON object, no extra text.`
         },
         {
           role: "user",
-          content: `Generate a trivia question from these categories: ${categories.join(', ')}. The question should be challenging but fair for a user at level ${level}. Randomly select one of the question types.`
+          content: `Generate ${count} trivia questions from these categories: ${categories.join(', ')}. The questions should be challenging but fair for a user at level ${level}.`
         }
       ],
       response_format: { type: "json_object" }
     });
 
     const content = response.choices[0].message.content;
-    const questionData = JSON.parse(content);
+    const questionsData = JSON.parse(content);
 
-    if (questionData.type === "multiple-choice") {
-      if (!Array.isArray(questionData.options) || questionData.options.length !== 4) {
-        throw new Error("Invalid multiple-choice question: must have 4 options.");
-      }
-    }
-    if (questionData.type === "true-false") {
-      if (
-        !Array.isArray(questionData.options) ||
-        questionData.options.length !== 2 ||
-        !questionData.options.includes("True") ||
-        !questionData.options.includes("False")
-      ) {
-        throw new Error("Invalid true-false question: must have ['True', 'False'] options.");
-      }
-    }
-    if (questionData.type === "one-word" || questionData.type === "math") {
-      if (questionData.options && questionData.options.length > 0) {
-        throw new Error("One-word and math questions should not have options.");
-      }
+    if (!Array.isArray(questionsData.questions) || questionsData.questions.length !== count) {
+      throw new Error(`Invalid response: expected ${count} questions`);
     }
 
-    return {
-      type: questionData.type,
-      question: questionData.question,
-      options: questionData.options || [],
-      correctAnswer: questionData.correctAnswer,
-      explanation: questionData.explanation
-    };
+    // Validate each question
+    questionsData.questions.forEach((questionData, index) => {
+      if (questionData.type === "multiple-choice") {
+        if (!Array.isArray(questionData.options) || questionData.options.length !== 4) {
+          throw new Error(`Invalid multiple-choice question at index ${index}: must have 4 options.`);
+        }
+      }
+      if (questionData.type === "true-false") {
+        if (
+          !Array.isArray(questionData.options) ||
+          questionData.options.length !== 2 ||
+          !questionData.options.includes("True") ||
+          !questionData.options.includes("False")
+        ) {
+          throw new Error(`Invalid true-false question at index ${index}: must have ['True', 'False'] options.`);
+        }
+      }
+      if (questionData.type === "one-word" || questionData.type === "math") {
+        if (questionData.options && questionData.options.length > 0) {
+          throw new Error(`One-word and math questions at index ${index} should not have options.`);
+        }
+      }
+    });
+
+    return questionsData.questions;
   } catch (error) {
-    console.error('Error generating trivia question:', error);
+    console.error('Error generating trivia questions:', error);
     throw error;
   }
+}
+
+// Keep the original function for backward compatibility
+export async function generateTriviaQuestion(categories, level) {
+  const questions = await generateTriviaQuestions(categories, level, 1);
+  return questions[0];
 } 

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAutoLogout } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
-import { generateTriviaQuestion } from '@/utils/openai';
+import { generateTriviaQuestions } from '@/utils/openai';
 
 function SinglePlayerGame() {
   const router = useRouter();
@@ -16,27 +16,24 @@ function SinglePlayerGame() {
 
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [gameState, setGameState] = useState('selection'); // 'selection' | 'playing' | 'summary'
-  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
 
-  const handleNextQuestion = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setTimeLeft(30);
-    try {
-      const question = await generateTriviaQuestion(selectedCategories, userLevel);
-      setCurrentQuestion(question);
-    } catch (error) {
-      console.error('Error generating next question:', error);
-      setError('Failed to generate next question. Please try again.');
-    } finally {
-      setIsLoading(false);
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const handleNextQuestion = useCallback(() => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setTimeLeft(30);
+    } else {
+      endGame();
     }
-  }, [selectedCategories, userLevel]);
+  }, [currentQuestionIndex, questions.length]);
 
   useEffect(() => {
     let timer;
@@ -64,9 +61,10 @@ function SinglePlayerGame() {
     setError(null);
     setTimeLeft(30);
     setScore(0);
+    setCurrentQuestionIndex(0);
     try {
-      const question = await generateTriviaQuestion(selectedCategories, userLevel);
-      setCurrentQuestion(question);
+      const generatedQuestions = await generateTriviaQuestions(selectedCategories, userLevel);
+      setQuestions(generatedQuestions);
       setGameState('playing');
     } catch (error) {
       console.error('Error starting game:', error);
@@ -85,7 +83,7 @@ function SinglePlayerGame() {
   const endGame = () => {
     setGameSummary({
       score,
-      totalQuestions: score + (currentQuestion ? 1 : 0),
+      totalQuestions: questions.length,
       categories: selectedCategories
     });
     setGameState('summary');
@@ -154,6 +152,7 @@ function SinglePlayerGame() {
                 Score: {score}
               </h2>
               <p className="text-[var(--color-fourth)]">Time left: {timeLeft}s</p>
+              <p className="text-[var(--color-fourth)]">Question {currentQuestionIndex + 1} of {questions.length}</p>
             </div>
             <button
               onClick={endGame}
@@ -171,7 +170,7 @@ function SinglePlayerGame() {
 
           {isLoading ? (
             <div className="text-center py-8">
-              <p className="text-[var(--color-fourth)]">Loading next question...</p>
+              <p className="text-[var(--color-fourth)]">Loading questions...</p>
             </div>
           ) : currentQuestion ? (
             <QuestionDisplay
@@ -182,6 +181,7 @@ function SinglePlayerGame() {
               explanation={currentQuestion.explanation}
               onAnswer={handleAnswer}
               onNextQuestion={handleNextQuestion}
+              isLastQuestion={currentQuestionIndex === questions.length - 1}
             />
           ) : null}
         </div>

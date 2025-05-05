@@ -42,22 +42,24 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      router.refresh()
-      router.push('/login')
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      router.refresh();
+      router.push("/login");
     } catch (error) {
-      console.error('Error logging out:', error.message)
+      console.error("Error logging out:", error.message);
     }
-  }
+  };
 
   if (!user) {
     return (
       <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
-        <div className="animate-pulse text-[var(--color-fourth)] text-xl">Loading...</div>
+        <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+          Loading...
+        </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -92,8 +94,12 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
-          <h1 className="text-4xl font-bold text-[var(--color-fourth)]">Welcome to Trivia on Tap</h1>
-          <p className="text-[var(--color-fourth)]/80 text-lg">Test your knowledge and have fun!</p>
+          <h1 className="text-4xl font-bold text-[var(--color-fourth)]">
+            Welcome to Trivia on Tap
+          </h1>
+          <p className="text-[var(--color-fourth)]/80 text-lg">
+            Test your knowledge and have fun!
+          </p>
         </div>
 
         <div className="flex flex-col items-center space-y-6 w-full">
@@ -108,12 +114,15 @@ export default function Dashboard() {
             <span className="text-xl">👥</span>
             <span>Multiplayer Mode</span>
           </button>
-          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+          <button
+            onClick={() => router.push("/dashboard/tutorial")}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+          >
             <span className="text-xl">📚</span>
             <span>Tutorial</span>
           </button>
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}
