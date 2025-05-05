@@ -1,4 +1,5 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserClient } from '@supabase/ssr'
+import { useEffect } from 'react'
 
 export const createClient = () => {
   return createBrowserClient(
@@ -13,5 +14,26 @@ export const getSupabase = () => {
   if (!supabase) {
     supabase = createClient();
   }
-  return supabase;
-};
+  return supabase
+}
+
+export const useAutoLogout = () => {
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      try {
+        const supabase = getSupabase()
+        await supabase.auth.signOut()
+      } catch (error) {
+        console.error('Error during auto logout:', error)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
+}
+
+export default getSupabase 

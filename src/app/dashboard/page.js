@@ -1,27 +1,44 @@
-"use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getSupabase } from "@/utils/supabase";
+'use client'
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import { getSupabase, useAutoLogout } from '@/utils/supabase'
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
-  const router = useRouter();
-  const supabase = getSupabase();
+  const [user, setUser] = useState(null)
+  const [userLevel, setUserLevel] = useState(null)
+  const [userName, setUserName] = useState('')
+  const router = useRouter()
+  const supabase = getSupabase()
+  
+  useAutoLogout()
+
+  const getUser = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+    } else {
+      setUser(user)
+      
+      // Fetch user level and username from the user table
+      const { data: userData, error } = await supabase
+        .from('user')
+        .select('user_name, user_level')
+        .eq('auth_id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching user data:', error)
+      } else {
+        setUserName(userData?.user_name || '')
+        setUserLevel(userData?.user_level || 1)
+      }
+    }
+  }, [router, supabase])
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-      } else {
-        setUser(user);
-      }
-    };
-
-    getUser();
-  }, [router]);
+    getUser()
+  }, [getUser])
 
   const handleLogout = async () => {
     try {
@@ -50,19 +67,20 @@ export default function Dashboard() {
       {/* Profile Section */}
       <div className="absolute top-6 left-6 flex items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
         <div className="bg-[var(--color-tertiary)] p-3 rounded-full shadow-md hover:bg-[var(--color-fourth)] transition-all duration-300 transform hover:scale-105">
-          <img src="/icons/profile.svg" alt="Profile" className="w-7 h-7" />
+          <Image src="/icons/profile.svg" alt="Profile" width={28} height={28} />
         </div>
         <div className="text-[var(--color-fourth)]">
-          <p className="font-semibold text-lg">{user.email}</p>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
-          >
-            Logout
-          </button>
+          <p className="font-semibold text-lg">{userName}</p>
+          <p className="text-sm">Level {userLevel}</p>
         </div>
+        <button
+          onClick={handleLogout}
+          className="text-sm text-red-600 hover:text-red-700 transition-colors duration-200"
+        >
+          Logout
+        </button>
       </div>
-
+      
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
@@ -75,8 +93,8 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-col items-center space-y-6 w-full">
-          <button
-            onClick={() => router.push("/dashboard/single-player")}
+          <button 
+            onClick={() => router.push(`/dashboard/single-player?level=${userLevel}`)}
             className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
           >
             <span className="text-xl">🎮</span>
