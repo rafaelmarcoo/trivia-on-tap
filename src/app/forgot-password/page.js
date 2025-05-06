@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getSupabase } from '@/utils/supabase'
 
@@ -8,7 +7,6 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
-  const router = useRouter()
   const supabase = getSupabase()
 
   const handleResetPassword = async (e) => {

@@ -12,7 +12,6 @@ export default function ResetPassword() {
   const supabase = getSupabase()
 
   useEffect(() => {
-    // Check if we have a session (user clicked the reset link)
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -56,7 +55,7 @@ export default function ResetPassword() {
         
         {success ? (
           <div className="text-green-500 mb-4">
-            Password updated successfully! Redirecting to login...
+            Password updated successfully! Redirecting to dashboard...
           </div>
         ) : (
           <form onSubmit={handleResetPassword}>
