@@ -1,57 +1,79 @@
-import React, { useState } from "react";
-import supabase from "./supabase-config";
+import React, { useEffect, useState } from "react";
+import supabase from "@/utils/supabase-config";
 
 const LevelingSystem = () => {
-  const [userId, setUserId] = useState("");
-  const [username, setUsername] = useState("");
-  const [currentLevel, setCurrentLevel] = useState(null);
+  const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState("");
 
-  // Fetch user data (username + level)
-  const fetchUserLevel = async () => {
-    if (!userId) return;
-
+  // Fetch all users initially
+  const fetchAllUsers = async () => {
     setError(null);
-    setInfo("");
-    setCurrentLevel(null);
-    setUsername("");
-
     try {
       const { data, error: fetchError } = await supabase
-        .from("user_level")
-        .select("user, level")
-        .eq("id", userId)
-        .single();
+        .from("user")
+        .select("id, user_name, user_level");
 
-      if (fetchError || !data) {
-        setError("Invalid user ID.");
+      if (fetchError) {
+        setError("Failed to fetch users.");
         return;
       }
 
-      setUsername(data.user);
-      setCurrentLevel(data.level);
-    } catch (err) {
-      setError("Something went wrong.");
+      setUsers(data);
+    } catch {
+      setError("Something went wrong while fetching users.");
     }
   };
 
-  // Update the user's level
-  // isWinning: true for increase, false for decrease
-  const updateLevel = async (isWinning) => {
-    if (currentLevel === null || !userId) return;
+  // Subscribe to real-time updates
+  useEffect(() => {
+    fetchAllUsers();
 
+    const channel = supabase
+      .channel("user-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user",
+        },
+        (payload) => {
+          const updatedUser = payload.new;
+
+          setUsers((prevUsers) =>
+            prevUsers.map((user) =>
+              user.id === updatedUser.id
+                ? { ...user, user_level: updatedUser.user_level }
+                : user
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    // Cleanup on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const updateLevel = async (userId, currentLevel, username, isWinning) => {
     const newLevel = isWinning
       ? currentLevel + 1
       : Math.max(0, currentLevel - 1);
 
     try {
-      await supabase
-        .from("user_level")
-        .update({ level: newLevel })
-        .eq("id", userId.trim());
+      const { error: updateError } = await supabase
+        .from("user")
+        .update({ user_level: newLevel })
+        .eq("id", userId);
 
-      setCurrentLevel(newLevel);
+      if (updateError) {
+        console.error("Update error:", updateError.message);
+        return;
+      }
+
       setInfo(`${username}'s level is now ${newLevel}`);
     } catch (err) {
       console.error("Update error:", err.message);
@@ -60,34 +82,43 @@ const LevelingSystem = () => {
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial" }}>
-      <h2>Leveling System (Test Page)</h2>
+      <h2>Leveling System (Realtime Enabled)</h2>
 
-      <input
-        type="text"
-        placeholder="User ID"
-        value={userId}
-        onChange={(e) => setUserId(e.target.value)}
-        style={{ padding: "5px", marginRight: "10px" }}
-      />
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {info && <p style={{ color: "green" }}>{info}</p>}
 
-      <button onClick={fetchUserLevel}>Fetch Level</button>
-
-      {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
-
-      {currentLevel !== null && (
-        <div style={{ marginTop: "15px" }}>
-          <p>
-            {username}&apos;s Current Level: <strong>{currentLevel}</strong>
-          </p>
-          <button onClick={() => updateLevel(true)}>Increase</button>
-          <button
-            onClick={() => updateLevel(false)}
-            style={{ marginLeft: "10px" }}
+      <div style={{ marginTop: "20px" }}>
+        {users.map((user) => (
+          <div
+            key={user.id}
+            style={{
+              padding: "10px",
+              borderBottom: "1px solid #ccc",
+              marginBottom: "10px",
+            }}
           >
-            Decrease
-          </button>
-        </div>
-      )}
+            <p>
+              <strong>{user.user_name}</strong> – Level:{" "}
+              <strong>{user.user_level}</strong>
+            </p>
+            <button
+              onClick={() =>
+                updateLevel(user.id, user.user_level, user.user_name, true)
+              }
+            >
+              Increase
+            </button>
+            <button
+              onClick={() =>
+                updateLevel(user.id, user.user_level, user.user_name, false)
+              }
+              style={{ marginLeft: "10px" }}
+            >
+              Decrease
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
