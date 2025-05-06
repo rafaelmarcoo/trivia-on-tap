@@ -4,8 +4,6 @@ const GameSummary = ({ gameSummary, onPlayAgain }) => {
   return (
     <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
       <h2 className="text-2xl mb-6 text-[var(--color-fourth)]">Game Summary</h2>
-      
-      {/* Overall Score */}
       <div className="mb-8 p-4 bg-[var(--color-primary)]/10 rounded-lg">
         <p className="text-[var(--color-fourth)] text-xl">
           Final Score: {gameSummary.score} / {gameSummary.totalQuestions}
@@ -14,8 +12,6 @@ const GameSummary = ({ gameSummary, onPlayAgain }) => {
           Categories: {gameSummary.categories.join(', ')}
         </p>
       </div>
-
-      {/* Questions Review */}
       <div className="space-y-6">
         <h3 className="text-xl text-[var(--color-fourth)]">Question Review</h3>
         {gameSummary.questions.map((q, index) => (
