@@ -18,6 +18,24 @@ export default function QuestionDisplay({
   const [userInput, setUserInput] = useState("");
   const [isCorrect, setIsCorrect] = useState(null);
 
+  useEffect(() => {
+    const insertQuestion = async () => {
+      const { error } = await supabase.from("questions").insert({
+        type: type,
+        question: question,
+        options: options,
+        correct_answer: correctAnswer,
+        explanation: explanation,
+      });
+
+      if (error) {
+        console.error("Error inserting question:", error.message);
+      }
+    };
+
+    insertQuestion();
+  }, [type, question, options, correctAnswer, explanation]);
+
   const handleAnswer = (answer) => {
     if (isAnswered) return;
 
