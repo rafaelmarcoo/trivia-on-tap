@@ -22,7 +22,9 @@ export default function QuestionDisplay({
 
     setSelectedAnswer(answer);
     setIsAnswered(true);
-    onAnswer(answer === correctAnswer);
+    const correct = answer === correctAnswer;
+    setIsCorrect(correct);
+    onAnswer(correct, answer);
   };
 
   const handleInputAnswer = (e) => {
@@ -43,7 +45,7 @@ export default function QuestionDisplay({
     setSelectedAnswer(userInput);
     setIsAnswered(true);
     setIsCorrect(correct);
-    onAnswer(correct);
+    onAnswer(correct, userInput);
   };
 
   const handleNext = () => {

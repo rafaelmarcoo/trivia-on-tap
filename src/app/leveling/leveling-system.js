@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import supabase from "@/utils/supabase-config";
+import { getSupabase } from "@/utils/supabase";
 
 const LevelingSystem = () => {
   const [users, setUsers] = useState([]);
@@ -10,7 +10,7 @@ const LevelingSystem = () => {
   const fetchAllUsers = async () => {
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await getSupabase
         .from("user")
         .select("id, user_name, user_level");
 
@@ -29,7 +29,7 @@ const LevelingSystem = () => {
   useEffect(() => {
     fetchAllUsers();
 
-    const channel = supabase
+    const channel = getSupabase
       .channel("user-updates")
       .on(
         "postgres_changes",
@@ -54,7 +54,7 @@ const LevelingSystem = () => {
 
     // Cleanup on unmount
     return () => {
-      supabase.removeChannel(channel);
+      getSupabase.removeChannel(channel);
     };
   }, []);
 
@@ -64,7 +64,7 @@ const LevelingSystem = () => {
       : Math.max(0, currentLevel - 1);
 
     try {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await getSupabase
         .from("user")
         .update({ user_level: newLevel })
         .eq("id", userId);
