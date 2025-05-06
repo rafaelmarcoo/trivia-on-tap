@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAutoLogout } from "@/utils/supabase";
+import { useAutoLogout, getSupabase } from "@/utils/supabase";
 import CategoryChecklist from "./components/CategoryChecklist";
 import QuestionDisplay from "./components/QuestionDisplay";
+import GameSummary from "../components/GameSummary";
 import { generateTriviaQuestions } from "@/utils/openai";
 
-function SinglePlayerGame() {
+function MultiPlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userLevel = searchParams.get("level") || 1;
+  const supabase = getSupabase();
 
   useAutoLogout();
 
@@ -23,6 +25,8 @@ function SinglePlayerGame() {
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
+  const [gameSessionId, setGameSessionId] = useState(null);
+  const [userAnswers, setUserAnswers] = useState([]);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -62,7 +66,41 @@ function SinglePlayerGame() {
     setTimeLeft(30);
     setScore(0);
     setCurrentQuestionIndex(0);
+    setUserAnswers([]);
+
     try {
+      // Get the current user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Create game session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from("game_sessions")
+        .insert({
+          game_type: "multi_player",
+          user_id: user.id,
+          total_questions: 20,
+          categories: selectedCategories,
+          difficulty_level: parseInt(userLevel),
+          time_per_question: 30,
+        })
+        .select()
+        .single();
+
+      if (sessionError) {
+        console.error("Session creation error:", sessionError);
+        throw sessionError;
+      }
+
+      setGameSessionId(sessionData.id);
+
       const generatedQuestions = await generateTriviaQuestions(
         selectedCategories,
         userLevel
@@ -71,25 +109,70 @@ function SinglePlayerGame() {
       setGameState("playing");
     } catch (error) {
       console.error("Error starting game:", error);
-      setError("Failed to start the game. Please try again.");
+      setError(error.message || "Failed to start the game. Please try again.");
+      setGameState("selection");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAnswer = (isCorrect) => {
+  const handleAnswer = async (isCorrect, userAnswer) => {
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
+
+    // Save user's answer
+    const currentQ = questions[currentQuestionIndex];
+    const answerData = {
+      game_session_id: gameSessionId,
+      question_text: currentQ.question,
+      question_type: currentQ.type,
+      options: currentQ.options,
+      correct_answer: currentQ.correctAnswer,
+      user_answer: userAnswer,
+      is_correct: isCorrect,
+      time_taken: 30 - timeLeft,
+      question_order: currentQuestionIndex + 1,
+    };
+
+    setUserAnswers((prev) => [...prev, answerData]);
+
+    try {
+      await supabase.from("game_questions").insert(answerData);
+    } catch (error) {
+      console.error("Error saving answer:", error);
+    }
   };
 
-  const endGame = () => {
-    setGameSummary({
-      score,
-      totalQuestions: questions.length,
-      categories: selectedCategories,
-    });
-    setGameState("summary");
+  const endGame = async () => {
+    try {
+      // Update game session with final score
+      await supabase
+        .from("game_sessions")
+        .update({
+          score: score,
+          ended_at: new Date().toISOString(),
+        })
+        .eq("id", gameSessionId);
+
+      // Prepare detailed summary
+      const detailedQuestions = questions.map((q, index) => ({
+        ...q,
+        userAnswer: userAnswers[index]?.user_answer,
+        isCorrect: userAnswers[index]?.is_correct,
+      }));
+
+      setGameSummary({
+        score,
+        totalQuestions: questions.length,
+        categories: selectedCategories,
+        questions: detailedQuestions,
+      });
+      setGameState("summary");
+    } catch (error) {
+      console.error("Error ending game:", error);
+      setError("Failed to save game results. Please try again.");
+    }
   };
 
   return (
@@ -104,7 +187,7 @@ function SinglePlayerGame() {
       {gameState === "selection" ? (
         <>
           <h1 className="text-4xl text-center mb-8 text-[var(--color-fourth)]">
-            Single Player Mode
+            Multi Player Mode
           </h1>
 
           <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
@@ -135,25 +218,12 @@ function SinglePlayerGame() {
           </div>
         </>
       ) : gameState === "summary" ? (
-        <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-          <h2 className="text-2xl mb-4 text-[var(--color-fourth)]">
-            Game Summary
-          </h2>
-          <div className="space-y-4">
-            <p className="text-[var(--color-fourth)]">
-              Score: {gameSummary.score} / {gameSummary.totalQuestions}
-            </p>
-            <p className="text-[var(--color-fourth)]">
-              Categories: {gameSummary.categories.join(", ")}
-            </p>
-            <button
-              onClick={() => setGameState("selection")}
-              className="w-full py-3 px-6 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
-            >
-              Play Again
-            </button>
-          </div>
-        </div>
+        <GameSummary
+          gameData={gameSummary}
+          onAction={() => setGameState("selection")}
+          actionLabel="Play Again"
+          showCategories={true}
+        />
       ) : (
         <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-6">
@@ -204,7 +274,7 @@ function SinglePlayerGame() {
   );
 }
 
-export default function SinglePlayerPage() {
+export default function MultiPlayerPage() {
   return (
     <Suspense
       fallback={
@@ -215,7 +285,7 @@ export default function SinglePlayerPage() {
         </div>
       }
     >
-      <SinglePlayerGame />
+      <MultiPlayerGame />
     </Suspense>
   );
 }
