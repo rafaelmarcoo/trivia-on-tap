@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import supabase from "@/utils/supabase-config";
+import { getSupabase } from "@/utils/supabase";
 
 export default function QuestionDisplay({
   type,
@@ -20,7 +20,7 @@ export default function QuestionDisplay({
 
   useEffect(() => {
     const insertQuestion = async () => {
-      const { error } = await supabase.from("questions").insert({
+      const { error } = await getSupabase.from("questions").insert({
         type: type,
         question: question,
         options: options,
