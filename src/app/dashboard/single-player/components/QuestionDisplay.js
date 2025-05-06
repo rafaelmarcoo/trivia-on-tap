@@ -35,7 +35,7 @@ export default function QuestionDisplay({
     if (type === "math") {
       const userNum = parseFloat(userInput.trim());
       const correctNum = parseFloat(correctAnswer.trim());
-      correct = Math.abs(userNum - correctNum) < 0.01; // Accept small float errors
+      correct = Math.abs(userNum - correctNum) < 0.01;
     } else {
       const userAns = userInput.trim().toLowerCase().replace(/\.$/, "");
       const correctAns = correctAnswer.trim().toLowerCase().replace(/\.$/, "");
