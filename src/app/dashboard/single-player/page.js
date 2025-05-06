@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAutoLogout, getSupabase } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
-import GameSummary from './components/GameSummary';
+import GameSummary from '../components/GameSummary';
 import { generateTriviaQuestions } from '@/utils/openai';
 
 function SinglePlayerGame() {
@@ -213,9 +213,11 @@ function SinglePlayerGame() {
           </div>
         </>
       ) : gameState === 'summary' ? (
-        <GameSummary 
-          gameSummary={gameSummary}
-          onPlayAgain={() => setGameState('selection')}
+        <GameSummary
+          gameData={gameSummary}
+          onAction={() => setGameState('selection')}
+          actionLabel="Play Again"
+          showCategories={true}
         />
       ) : (
         <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
