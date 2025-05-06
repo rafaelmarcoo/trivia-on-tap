@@ -3,17 +3,20 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/utils/supabase'
-import { ArrowLeft, LogOut, Camera, User } from 'lucide-react'
+import { ArrowLeft, LogOut, Camera, User, Pencil } from 'lucide-react'
 
 export default function UserProfile() {
   const [user, setUser] = useState(null)
   const [userName, setUserName] = useState('')
   const [userLevel, setUserLevel] = useState(1)
   const [joinedDate, setJoinedDate] = useState('')
+  const [status, setStatus] = useState('')
+  const [editingStatus, setEditingStatus] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [profileImage, setProfileImage] = useState(null)
 
   const fileInputRef = useRef(null)
+  const statusInputRef = useRef(null)
   const router = useRouter()
   const supabase = getSupabase()
 
@@ -27,13 +30,14 @@ export default function UserProfile() {
 
       const { data, error } = await supabase
         .from('user')
-        .select('user_name, user_level')
+        .select('user_name, user_level, status')
         .eq('auth_id', user.id)
         .single()
 
       if (!error && data) {
         setUserName(data.user_name)
         setUserLevel(data.user_level)
+        setStatus(data.status || 'Feeling smart!')
       }
     }
   }, [router, supabase])
@@ -66,6 +70,26 @@ export default function UserProfile() {
     reader.readAsDataURL(file)
   }
 
+  const updateStatus = async (newStatus) => {
+    if (!user) return
+    const { error } = await supabase
+      .from('user')
+      .update({ status: newStatus })
+      .eq('auth_id', user.id)
+
+    if (error) console.error('Status update failed:', error.message)
+  }
+
+  const handleStatusChange = (e) => {
+    const newStatus = e.target.value
+    setStatus(newStatus)
+  }
+
+  const handleStatusBlur = async () => {
+    setEditingStatus(false)
+    await updateStatus(status)
+  }
+
   if (!user) return <div className="p-10 text-center">Loading...</div>
 
   return (
@@ -82,7 +106,7 @@ export default function UserProfile() {
           </button>
         </div>
 
-        {/* Profile Picture */}
+        {/* Profile Section */}
         <div className="flex flex-col items-center">
           <div onClick={() => fileInputRef.current.click()} className="relative group cursor-pointer">
             <div className="h-32 w-32 rounded-full border-4 border-amber-200 overflow-hidden flex items-center justify-center bg-gradient-to-br from-amber-300 to-amber-500 hover:scale-105 transition-all">
@@ -105,9 +129,43 @@ export default function UserProfile() {
           </div>
           <h1 className="text-2xl font-bold text-amber-900 mt-4">{userName}</h1>
           <p className="text-amber-700">{user.email}</p>
-        </div>
 
-        {/* Info */}
+
+        {/* Status */}
+        <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-xl shadow-lg border border-amber-100 transition-all duration-300">
+      <div className="flex justify-between items-center">
+        <span className="font-medium text-amber-900 text-lg">Status</span>
+        
+        {editingStatus ? (
+          <div className="relative w-full max-w-xs ml-4">
+            <input
+              type="text"
+              value={status}
+              onChange={handleStatusChange}
+              onBlur={handleStatusBlur}
+              onKeyDown={handleKeyDown}
+              ref={statusInputRef}
+              className="border border-amber-300 rounded-lg px-3 py-2 text-sm w-full text-right text-amber-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent focus:outline-none shadow-sm"
+              autoFocus
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 ml-4">
+            <span className="text-right text-amber-800 font-medium max-w-xs truncate">{status}</span>
+            <button 
+              onClick={() => setEditingStatus(true)} 
+              className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-100 transition-colors duration-200"
+              aria-label="Edit status"
+            >
+              <Pencil size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+        {/* Info Card */}
         <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md space-y-4">
           <div className="flex justify-between text-amber-800">
             <span>User ID</span>
