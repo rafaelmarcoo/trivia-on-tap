@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import supabase from "@/utils/supabase-config";
 
 export default function QuestionDisplay({
   type,
@@ -16,6 +17,24 @@ export default function QuestionDisplay({
   const [isAnswered, setIsAnswered] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isCorrect, setIsCorrect] = useState(null);
+
+  useEffect(() => {
+    const insertQuestion = async () => {
+      const { error } = await supabase.from("questions").insert({
+        type: type,
+        question: question,
+        options: options,
+        correct_answer: correctAnswer,
+        explanation: explanation,
+      });
+
+      if (error) {
+        console.error("Error inserting question:", error.message);
+      }
+    };
+
+    insertQuestion();
+  }, [type, question, options, correctAnswer, explanation]);
 
   const handleAnswer = (answer) => {
     if (isAnswered) return;

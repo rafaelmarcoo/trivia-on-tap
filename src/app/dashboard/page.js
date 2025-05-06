@@ -1,44 +1,46 @@
-'use client'
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import { getSupabase, useAutoLogout } from '@/utils/supabase'
+"use client";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { getSupabase, useAutoLogout } from "@/utils/supabase";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null)
-  const [userLevel, setUserLevel] = useState(null)
-  const [userName, setUserName] = useState('')
-  const router = useRouter()
-  const supabase = getSupabase()
-  
-  useAutoLogout()
+  const [user, setUser] = useState(null);
+  const [userLevel, setUserLevel] = useState(null);
+  const [userName, setUserName] = useState("");
+  const router = useRouter();
+  const supabase = getSupabase();
+
+  useAutoLogout();
 
   const getUser = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
-      router.push('/login')
+      router.push("/login");
     } else {
-      setUser(user)
-      
+      setUser(user);
+
       // Fetch user level and username from the user table
       const { data: userData, error } = await supabase
-        .from('user')
-        .select('user_name, user_level')
-        .eq('auth_id', user.id)
-        .single()
-      
+        .from("user")
+        .select("user_name, user_level")
+        .eq("auth_id", user.id)
+        .single();
+
       if (error) {
-        console.error('Error fetching user data:', error)
+        console.error("Error fetching user data:", error);
       } else {
-        setUserName(userData?.user_name || '')
-        setUserLevel(userData?.user_level || 1)
+        setUserName(userData?.user_name || "");
+        setUserLevel(userData?.user_level || 1);
       }
     }
-  }, [router, supabase])
+  }, [router, supabase]);
 
   useEffect(() => {
-    getUser()
-  }, [getUser])
+    getUser();
+  }, [getUser]);
 
   const handleLogout = async () => {
     try {
@@ -89,8 +91,6 @@ export default function Dashboard() {
         Logout
       </button>
     </div>
-  
-      
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
@@ -103,14 +103,21 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-col items-center space-y-6 w-full">
-          <button 
-            onClick={() => router.push(`/dashboard/single-player?level=${userLevel}`)}
+          <button
+            onClick={() =>
+              router.push(`/dashboard/single-player?level=${userLevel}`)
+            }
             className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
           >
             <span className="text-xl">🎮</span>
             <span>Single Player Mode</span>
           </button>
-          <button className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3">
+          <button
+            onClick={() =>
+              router.push(`/dashboard/multi-player?level=${userLevel}`)
+            }
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+          >
             <span className="text-xl">👥</span>
             <span>Multiplayer Mode</span>
           </button>
