@@ -9,27 +9,17 @@ const categories = [
   { id: "math", name: "Math" },
 ];
 
-export default function CategoryChecklist({
-  selectedCategories,
-  onCategoryToggle,
-}) {
+export default function CategoryChecklist() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
       {categories.map((category) => (
         <div
           key={category.id}
-          className={`flex items-center p-4 rounded-lg cursor-pointer transition-colors ${
-            selectedCategories.includes(category.id)
-              ? "bg-[var(--color-tertiary)] border-[var(--color-tertiary)]"
-              : "bg-[var(--color-primary)] border-[var(--color-fourth)]"
-          } border-2`}
-          onClick={() => onCategoryToggle(category.id)}
+          className="flex items-center p-4 rounded-lg bg-[var(--color-primary)] border-[var(--color-fourth)] border-2"
         >
           <input
             type="checkbox"
             id={category.id}
-            checked={selectedCategories.includes(category.id)}
-            onChange={() => onCategoryToggle(category.id)}
             className="w-5 h-5 mr-3 cursor-pointer accent-[var(--color-tertiary)]"
           />
           <label
