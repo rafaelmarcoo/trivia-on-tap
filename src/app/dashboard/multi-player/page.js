@@ -19,6 +19,7 @@ function MultiPlayerGame() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [gameState, setGameState] = useState("selection"); // 'selection' | 'playing' | 'summary'
   const [questions, setQuestions] = useState([]);
+  const [questionText, setQuestionText] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,6 +175,23 @@ function MultiPlayerGame() {
       setError("Failed to save game results. Please try again.");
     }
   };
+  useEffect(() => {
+    const fetchQuestionText = async () => {
+      const { data, error } = await supabase
+        .from("game_questions")
+        .select("question_text")
+        .eq("game_session_id", gameSessionId)
+        .eq("question_order", currentQuestionIndex + 1)
+        .order("question_order", { ascending: true })
+        .single();
+
+      if (data) {
+        setQuestionText(data.question_text);
+      }
+    };
+
+    fetchQuestionText();
+  }, [gameSessionId, currentQuestionIndex]);
 
   return (
     <div className="max-w-3xl mx-auto p-8 min-h-screen bg-[var(--color-primary)]">
@@ -259,7 +277,7 @@ function MultiPlayerGame() {
           ) : currentQuestion ? (
             <QuestionDisplay
               type={currentQuestion.type}
-              question={currentQuestion.question}
+              question={questionText}
               options={currentQuestion.options}
               correctAnswer={currentQuestion.correctAnswer}
               explanation={currentQuestion.explanation}
