@@ -1,12 +1,22 @@
 "use client";
 
+"use client";
+
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoLogout, getSupabase } from "@/utils/supabase";
-import CategoryChecklist from "./components/CategoryChecklist";
 import QuestionDisplay from "./components/QuestionDisplay";
 import GameSummary from "../components/GameSummary";
 import { generateTriviaQuestions } from "@/utils/openai";
+
+const categories = [
+  { id: "general", name: "General" },
+  { id: "history", name: "History" },
+  { id: "technology", name: "Technology" },
+  { id: "geography", name: "Geography" },
+  { id: "science", name: "Science" },
+  { id: "math", name: "Math" },
+];
 
 function MultiPlayerGame() {
   const router = useRouter();
@@ -16,10 +26,8 @@ function MultiPlayerGame() {
 
   useAutoLogout();
 
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [gameState, setGameState] = useState("selection"); // 'selection' | 'playing' | 'summary'
+  const [gameState, setGameState] = useState("playing"); // Start directly in 'playing' state
   const [questions, setQuestions] = useState([]);
-  const [questionText, setQuestionText] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,15 +60,6 @@ function MultiPlayerGame() {
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
 
-  const handleCategoryToggle = (category) => {
-    setSelectedCategories((prev) => {
-      if (prev.includes(category)) {
-        return prev.filter((cat) => cat !== category);
-      }
-      return [...prev, category];
-    });
-  };
-
   const startGame = async () => {
     setIsLoading(true);
     setError(null);
@@ -88,7 +87,7 @@ function MultiPlayerGame() {
           game_type: "multi_player",
           user_id: user.id,
           total_questions: 20,
-          categories: selectedCategories,
+          categories: categories.map((category) => category.id), // Use all categories
           difficulty_level: parseInt(userLevel),
           time_per_question: 30,
         })
@@ -103,7 +102,7 @@ function MultiPlayerGame() {
       setGameSessionId(sessionData.id);
 
       const generatedQuestions = await generateTriviaQuestions(
-        selectedCategories,
+        categories.map((category) => category.id), // Use all categories
         userLevel
       );
       setQuestions(generatedQuestions);
@@ -116,7 +115,7 @@ function MultiPlayerGame() {
       setIsLoading(false);
     }
   };
-
+  //need to insert before answer
   const handleAnswer = async (isCorrect, userAnswer) => {
     if (isCorrect) {
       setScore((prev) => prev + 1);
@@ -166,7 +165,7 @@ function MultiPlayerGame() {
       setGameSummary({
         score,
         totalQuestions: questions.length,
-        categories: selectedCategories,
+        categories: categories.map((category) => category.name), // Use all categories
         questions: detailedQuestions,
       });
       setGameState("summary");
@@ -175,23 +174,11 @@ function MultiPlayerGame() {
       setError("Failed to save game results. Please try again.");
     }
   };
+
+  // Start the game automatically
   useEffect(() => {
-    const fetchQuestionText = async () => {
-      const { data, error } = await supabase
-        .from("game_questions")
-        .select("question_text")
-        .eq("game_session_id", gameSessionId)
-        .eq("question_order", currentQuestionIndex + 1)
-        .order("question_order", { ascending: true })
-        .single();
-
-      if (data) {
-        setQuestionText(data.question_text);
-      }
-    };
-
-    fetchQuestionText();
-  }, [gameSessionId, currentQuestionIndex]);
+    startGame();
+  }, []);
 
   return (
     <div className="max-w-3xl mx-auto p-8 min-h-screen bg-[var(--color-primary)]">
@@ -202,43 +189,13 @@ function MultiPlayerGame() {
         <span>←</span> Back to Dashboard
       </button>
 
-      {gameState === "selection" ? (
-        <>
-          <h1 className="text-4xl text-center mb-8 text-[var(--color-fourth)]">
-            Multi Player Mode
-          </h1>
-
-          <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl mb-4 text-[var(--color-fourth)]">
-              Select Categories
-            </h2>
-            <p className="text-[var(--color-fourth)]/80 mb-8">
-              Choose the categories you want to play with. You can select
-              multiple categories.
-            </p>
-
-            <CategoryChecklist
-              selectedCategories={selectedCategories}
-              onCategoryToggle={handleCategoryToggle}
-            />
-
-            <button
-              className={`w-full py-4 px-8 rounded-lg text-lg ${
-                selectedCategories.length > 0
-                  ? "bg-[var(--color-tertiary)] cursor-pointer"
-                  : "bg-[var(--color-fourth)] cursor-not-allowed"
-              } text-[var(--color-primary)]`}
-              onClick={startGame}
-              disabled={selectedCategories.length === 0 || isLoading}
-            >
-              {isLoading ? "Loading..." : "Start Game"}
-            </button>
-          </div>
-        </>
-      ) : gameState === "summary" ? (
+      {gameState === "summary" ? (
         <GameSummary
           gameData={gameSummary}
-          onAction={() => setGameState("selection")}
+          onAction={() => {
+            setGameState("playing");
+            startGame();
+          }}
           actionLabel="Play Again"
           showCategories={true}
         />
@@ -277,7 +234,7 @@ function MultiPlayerGame() {
           ) : currentQuestion ? (
             <QuestionDisplay
               type={currentQuestion.type}
-              question={questionText}
+              question={currentQuestion.question}
               options={currentQuestion.options}
               correctAnswer={currentQuestion.correctAnswer}
               explanation={currentQuestion.explanation}
