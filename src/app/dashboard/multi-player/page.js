@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoLogout } from "@/utils/supabase";
-import CategoryChecklist from "./components/CategoryChecklist";
 import QuestionDisplay from "./components/QuestionDisplay";
 import { generateTriviaQuestions } from "@/utils/openai";
+import Lobby from "./components/lobby";
 
 function SinglePlayerGame() {
   const router = useRouter();
@@ -14,8 +14,7 @@ function SinglePlayerGame() {
 
   useAutoLogout();
 
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [gameState, setGameState] = useState("selection"); // 'selection' | 'playing' | 'summary'
+  const [gameState, setGameState] = useState("start"); // 'start' | 'playing' | 'summary'
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -47,15 +46,6 @@ function SinglePlayerGame() {
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
 
-  const handleCategoryToggle = (category) => {
-    setSelectedCategories((prev) => {
-      if (prev.includes(category)) {
-        return prev.filter((cat) => cat !== category);
-      }
-      return [...prev, category];
-    });
-  };
-
   const startGame = async () => {
     setIsLoading(true);
     setError(null);
@@ -63,10 +53,7 @@ function SinglePlayerGame() {
     setScore(0);
     setCurrentQuestionIndex(0);
     try {
-      const generatedQuestions = await generateTriviaQuestions(
-        selectedCategories,
-        userLevel
-      );
+      const generatedQuestions = await generateTriviaQuestions([], userLevel);
       setQuestions(generatedQuestions);
       setGameState("playing");
     } catch (error) {
@@ -87,7 +74,6 @@ function SinglePlayerGame() {
     setGameSummary({
       score,
       totalQuestions: questions.length,
-      categories: selectedCategories,
     });
     setGameState("summary");
   };
@@ -101,36 +87,23 @@ function SinglePlayerGame() {
         <span>←</span> Back to Dashboard
       </button>
 
-      {gameState === "selection" ? (
+      {gameState === "start" ? (
         <>
           <h1 className="text-4xl text-center mb-8 text-[var(--color-fourth)]">
-            Single Player Mode
+            Multi Player Mode
           </h1>
 
           <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl mb-4 text-[var(--color-fourth)]">
-              Select Categories
+            <h2 className="text-2xl mb-4 font-bold text-center text-[var(--color-fourth)]">
+              CLICK ON THE BUTTON BELOW
+              <p className="text-4xl text-center font-bold mb-8 text-[var(--color-fourth)]">↓</p>
             </h2>
-            <p className="text-[var(--color-fourth)]/80 mb-8">
-              Choose the categories you want to play with. You can select
-              multiple categories.
-            </p>
-
-            <CategoryChecklist
-              selectedCategories={selectedCategories}
-              onCategoryToggle={handleCategoryToggle}
-            />
-
             <button
-              className={`w-full py-4 px-8 rounded-lg text-lg ${
-                selectedCategories.length > 0
-                  ? "bg-[var(--color-tertiary)] cursor-pointer"
-                  : "bg-[var(--color-fourth)] cursor-not-allowed"
-              } text-[var(--color-primary)]`}
+              className="w-full py-4 px-8 rounded-lg text-lg bg-[var(--color-tertiary)] cursor-pointer text-[var(--color-primary)]"
               onClick={startGame}
-              disabled={selectedCategories.length === 0 || isLoading}
+              disabled={isLoading}
             >
-              {isLoading ? "Loading..." : "Start Game"}
+              {isLoading ? "Loading..." : "Enter Lobby"}
             </button>
           </div>
         </>
@@ -143,11 +116,8 @@ function SinglePlayerGame() {
             <p className="text-[var(--color-fourth)]">
               Score: {gameSummary.score} / {gameSummary.totalQuestions}
             </p>
-            <p className="text-[var(--color-fourth)]">
-              Categories: {gameSummary.categories.join(", ")}
-            </p>
             <button
-              onClick={() => setGameState("selection")}
+              onClick={() => setGameState("start")}
               className="w-full py-3 px-6 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
             >
               Play Again
@@ -187,16 +157,7 @@ function SinglePlayerGame() {
               <p className="text-[var(--color-fourth)]">Loading questions...</p>
             </div>
           ) : currentQuestion ? (
-            <QuestionDisplay
-              type={currentQuestion.type}
-              question={currentQuestion.question}
-              options={currentQuestion.options}
-              correctAnswer={currentQuestion.correctAnswer}
-              explanation={currentQuestion.explanation}
-              onAnswer={handleAnswer}
-              onNextQuestion={handleNextQuestion}
-              isLastQuestion={currentQuestionIndex === questions.length - 1}
-            />
+            <Lobby/>
           ) : null}
         </div>
       )}
