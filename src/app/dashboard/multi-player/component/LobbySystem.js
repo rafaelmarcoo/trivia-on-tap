@@ -110,6 +110,9 @@ export default function LobbySystem() {
 
       if (playerError) throw playerError;
 
+      // Wait a moment to ensure all database operations are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Navigate to the lobby
       window.location.href = `/dashboard/multi-player?lobby=${lobby.id}`;
     } catch (error) {
@@ -265,7 +268,13 @@ export default function LobbySystem() {
           <h2 className="text-xl font-semibold text-white mb-4">
             Available Lobbies
           </h2>
-          {lobbies.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+                Loading lobbies...
+              </div>
+            </div>
+          ) : lobbies.length === 0 ? (
             <p className="text-gray-300">No lobbies available</p>
           ) : (
             <div className="space-y-4">
@@ -297,7 +306,7 @@ export default function LobbySystem() {
                         disabled={isLoading}
                         className="bg-[var(--color-fourth)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
                       >
-                        Join
+                        {isLoading ? "Joining..." : "Join"}
                       </button>
                     )}
                   </div>

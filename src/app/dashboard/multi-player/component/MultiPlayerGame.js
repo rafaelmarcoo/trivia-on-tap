@@ -301,6 +301,31 @@ export default function MultiPlayerGame() {
   }
 
   if (gameState === "lobby") {
+    if (isLoading || !lobbyData) {
+      return (
+        <div className="min-h-screen bg-[var(--color-primary)] p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
+                Game Lobby
+              </h1>
+              <button
+                onClick={() => router.push("/dashboard/multi-player")}
+                className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+              >
+                Leave Lobby
+              </button>
+            </div>
+            <div className="flex items-center justify-center h-[60vh]">
+              <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+                Loading lobby...
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[var(--color-primary)] p-8">
         <div className="max-w-4xl mx-auto">
@@ -309,7 +334,32 @@ export default function MultiPlayerGame() {
               Game Lobby
             </h1>
             <button
-              onClick={() => router.push("/dashboard/multi-player")}
+              onClick={async () => {
+                try {
+                  // Remove player from lobby
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await supabase
+                      .from("game_lobby_players")
+                      .delete()
+                      .eq("lobby_id", lobbyId)
+                      .eq("user_id", user.id);
+
+                    // Update player count
+                    await supabase
+                      .from("game_lobbies")
+                      .update({ 
+                        current_players: lobbyData.current_players - 1,
+                        status: lobbyData.current_players <= 1 ? "completed" : "waiting"
+                      })
+                      .eq("id", lobbyId);
+                  }
+                  router.push("/dashboard/multi-player");
+                } catch (error) {
+                  console.error("Error leaving lobby:", error);
+                  setError("Failed to leave lobby");
+                }
+              }}
               className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
             >
               Leave Lobby
@@ -324,10 +374,10 @@ export default function MultiPlayerGame() {
 
           <div className="bg-[var(--color-secondary)] p-6 rounded-lg">
             <h2 className="text-xl font-semibold text-white mb-4">
-              Players ({lobbyData.current_players}/{lobbyData.max_players})
+              Players ({lobbyData?.current_players || 0}/{lobbyData?.max_players || 4})
             </h2>
             <div className="space-y-2">
-              {lobbyData.game_lobby_players?.map((player) => (
+              {lobbyData?.game_lobby_players?.map((player) => (
                 <div
                   key={player.user_id}
                   className="flex items-center gap-2 bg-[var(--color-primary)] p-3 rounded-lg"
@@ -340,6 +390,18 @@ export default function MultiPlayerGame() {
                 </div>
               ))}
             </div>
+
+            {currentUserId === lobbyData.host_id && (
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => startGame(lobbyId)}
+                  disabled={isLoading || (lobbyData?.current_players || 0) < 2}
+                  className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
+                >
+                  {isLoading ? "Starting..." : "Start Game"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
