@@ -68,11 +68,14 @@ export default function LobbySystem({ onGameStart }) {
   const createLobby = async () => {
     try {
       setIsCreatingLobby(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      setError(null);
       
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!user) throw new Error("Not authenticated");
 
-      const { data, error } = await supabase
+      // Create the lobby
+      const { data: lobbyData, error: lobbyError } = await supabase
         .from("game_lobbies")
         .insert({
           host_id: user.id,
@@ -83,19 +86,23 @@ export default function LobbySystem({ onGameStart }) {
         .select()
         .single();
 
-      if (error) throw error;
+      if (lobbyError) throw lobbyError;
 
       // Join the lobby as host
-      await supabase.from("game_lobby_players").insert({
-        lobby_id: data.id,
-        user_id: user.id
-      });
+      const { error: joinError } = await supabase
+        .from("game_lobby_players")
+        .insert({
+          lobby_id: lobbyData.id,
+          user_id: user.id
+        });
+
+      if (joinError) throw joinError;
 
       // Navigate to the lobby
-      router.push(`/dashboard/multi-player?lobby=${data.id}`);
+      router.push(`/dashboard/multi-player?lobby=${lobbyData.id}`);
     } catch (error) {
       console.error("Error creating lobby:", error);
-      setError("Failed to create lobby");
+      setError(error.message || "Failed to create lobby");
     } finally {
       setIsCreatingLobby(false);
     }
@@ -103,38 +110,64 @@ export default function LobbySystem({ onGameStart }) {
 
   const joinLobby = async (lobbyId) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      setError(null);
       
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
       if (!user) throw new Error("Not authenticated");
 
+      // Check if already in lobby
+      const { data: existingPlayer, error: checkError } = await supabase
+        .from("game_lobby_players")
+        .select("id")
+        .eq("lobby_id", lobbyId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (checkError && checkError.code !== "PGRST116") { // PGRST116 is "no rows returned"
+        throw checkError;
+      }
+
+      if (existingPlayer) {
+        // Already in lobby, just navigate
+        router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
+        return;
+      }
+
       // Check if lobby is full
-      const { data: lobby } = await supabase
+      const { data: lobby, error: lobbyError } = await supabase
         .from("game_lobbies")
-        .select("current_players, max_players")
+        .select("current_players, max_players, status")
         .eq("id", lobbyId)
         .single();
 
-      if (lobby.current_players >= lobby.max_players) {
-        throw new Error("Lobby is full");
-      }
+      if (lobbyError) throw lobbyError;
+      if (lobby.status !== "waiting") throw new Error("Lobby is no longer available");
+      if (lobby.current_players >= lobby.max_players) throw new Error("Lobby is full");
 
       // Join the lobby
-      await supabase.from("game_lobby_players").insert({
-        lobby_id: lobbyId,
-        user_id: user.id
-      });
+      const { error: joinError } = await supabase
+        .from("game_lobby_players")
+        .insert({
+          lobby_id: lobbyId,
+          user_id: user.id
+        });
+
+      if (joinError) throw joinError;
 
       // Update player count
-      await supabase
+      const { error: updateError } = await supabase
         .from("game_lobbies")
         .update({ current_players: lobby.current_players + 1 })
         .eq("id", lobbyId);
+
+      if (updateError) throw updateError;
 
       // Navigate to the lobby
       router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
     } catch (error) {
       console.error("Error joining lobby:", error);
-      setError("Failed to join lobby");
+      setError(error.message || "Failed to join lobby");
     }
   };
 

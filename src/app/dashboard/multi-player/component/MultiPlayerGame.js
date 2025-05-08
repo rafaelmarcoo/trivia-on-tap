@@ -283,7 +283,32 @@ export default function MultiPlayerGame() {
               Game Lobby
             </h1>
             <button
-              onClick={() => router.push("/dashboard/multi-player")}
+              onClick={async () => {
+                try {
+                  // Remove player from lobby
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await supabase
+                      .from("game_lobby_players")
+                      .delete()
+                      .eq("lobby_id", lobbyId)
+                      .eq("user_id", user.id);
+
+                    // Update player count
+                    await supabase
+                      .from("game_lobbies")
+                      .update({ 
+                        current_players: lobbyData.current_players - 1,
+                        status: lobbyData.current_players <= 1 ? "completed" : "waiting"
+                      })
+                      .eq("id", lobbyId);
+                  }
+                  router.push("/dashboard/multi-player");
+                } catch (error) {
+                  console.error("Error leaving lobby:", error);
+                  setError("Failed to leave lobby");
+                }
+              }}
               className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
             >
               Leave Lobby
@@ -318,18 +343,31 @@ export default function MultiPlayerGame() {
                   <button
                     onClick={async () => {
                       try {
-                        await supabase
+                        setError(null);
+                        // Check if there are enough players
+                        if (lobbyData.current_players < 1) {
+                          throw new Error("Need at least 1 player to start");
+                        }
+
+                        // Update lobby status to starting
+                        const { error: updateError } = await supabase
                           .from("game_lobbies")
                           .update({ status: "starting" })
                           .eq("id", lobbyId);
+
+                        if (updateError) throw updateError;
+
+                        // Initialize the game
+                        await initializeGame(lobbyData);
                       } catch (error) {
                         console.error("Error starting game:", error);
-                        setError("Failed to start game");
+                        setError(error.message || "Failed to start game");
                       }
                     }}
-                    className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90"
+                    disabled={lobbyData.current_players < 1}
+                    className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
                   >
-                    Start Game
+                    {lobbyData.current_players < 1 ? "Waiting for Players..." : "Start Game"}
                   </button>
                 </div>
               )}
