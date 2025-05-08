@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getSupabase } from "@/utils/supabase";
+import { useState } from "react";
 
+/**
+ * A component that displays a question and handles user answers
+ * @param {string} type - The type of question ('multiple-choice', 'true-false', 'one-word', 'math')
+ * @param {string} question - The question text
+ * @param {string[]} options - Array of answer options (for multiple-choice/true-false)
+ * @param {string} correctAnswer - The correct answer
+ * @param {string} explanation - Explanation of the answer
+ * @param {function} onAnswer - Callback when user answers (receives isCorrect, answer)
+ * @param {function} onNextQuestion - Callback to move to next question
+ * @param {boolean} isLastQuestion - Flag if this is the last question
+ */
 export default function QuestionDisplay({
   type,
   question,
@@ -13,47 +23,45 @@ export default function QuestionDisplay({
   onNextQuestion,
   isLastQuestion = false,
 }) {
+  // State for tracking user's selected answer
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  // State to track if question has been answered
   const [isAnswered, setIsAnswered] = useState(false);
+  // State for user input (for one-word/math questions)
   const [userInput, setUserInput] = useState("");
+  // State to track if answer was correct
   const [isCorrect, setIsCorrect] = useState(null);
 
-  useEffect(() => {
-    const insertQuestion = async () => {
-      const { error } = await getSupabase.from("questions").insert({
-        type: type,
-        question: question,
-        options: options,
-        correct_answer: correctAnswer,
-        explanation: explanation,
-      });
-
-      if (error) {
-        console.error("Error inserting question:", error.message);
-      }
-    };
-
-    insertQuestion();
-  }, [type, question, options, correctAnswer, explanation]);
-
+  /**
+   * Handles selection of an answer (for multiple-choice/true-false)
+   * @param {string} answer - The selected answer
+   */
   const handleAnswer = (answer) => {
-    if (isAnswered) return;
+    if (isAnswered) return; // Prevent answering again
 
     setSelectedAnswer(answer);
     setIsAnswered(true);
-    onAnswer(answer === correctAnswer);
+    const correct = answer === correctAnswer;
+    setIsCorrect(correct);
+    onAnswer(correct, answer);
   };
 
+  /**
+   * Handles submission of input answer (for one-word/math questions)
+   * @param {Event} e - Form submission event
+   */
   const handleInputAnswer = (e) => {
     e.preventDefault();
-    if (isAnswered) return;
+    if (isAnswered) return; // Prevent answering again
 
     let correct = false;
     if (type === "math") {
+      // For math questions, compare numbers with small tolerance
       const userNum = parseFloat(userInput.trim());
       const correctNum = parseFloat(correctAnswer.trim());
       correct = Math.abs(userNum - correctNum) < 0.01;
     } else {
+      // For one-word, compare strings (case-insensitive, ignore trailing period)
       const userAns = userInput.trim().toLowerCase().replace(/\.$/, "");
       const correctAns = correctAnswer.trim().toLowerCase().replace(/\.$/, "");
       correct = userAns === correctAns;
@@ -62,9 +70,12 @@ export default function QuestionDisplay({
     setSelectedAnswer(userInput);
     setIsAnswered(true);
     setIsCorrect(correct);
-    onAnswer(correct);
+    onAnswer(correct, userInput);
   };
 
+  /**
+   * Resets state and moves to next question
+   */
   const handleNext = () => {
     setSelectedAnswer(null);
     setIsAnswered(false);
@@ -72,6 +83,10 @@ export default function QuestionDisplay({
     onNextQuestion();
   };
 
+  /**
+   * Renders the appropriate question type UI
+   * @returns {JSX.Element} The question input component
+   */
   const renderQuestionType = () => {
     switch (type) {
       case "multiple-choice":
@@ -85,11 +100,11 @@ export default function QuestionDisplay({
                 className={`p-4 rounded-lg border-2 transition-colors ${
                   isAnswered
                     ? option === correctAnswer
-                      ? "bg-green-100 border-green-500"
+                      ? "bg-green-100 border-green-500" // Correct answer styling
                       : selectedAnswer === option
-                      ? "bg-red-100 border-red-500"
-                      : "bg-[var(--color-primary)] border-[var(--color-fourth)]"
-                    : "bg-[var(--color-primary)] border-[var(--color-fourth)] hover:bg-[var(--color-tertiary)]"
+                      ? "bg-red-100 border-red-500" // Incorrect selected answer
+                      : "bg-[var(--color-primary)] border-[var(--color-fourth)]" // Unselected option
+                    : "bg-[var(--color-primary)] border-[var(--color-fourth)] hover:bg-[var(--color-tertiary)]" // Default state
                 }`}
               >
                 {option}
@@ -134,9 +149,9 @@ export default function QuestionDisplay({
               className={`w-full p-4 rounded-lg border-2 bg-[var(--color-primary)] ${
                 isAnswered
                   ? isCorrect
-                    ? "border-green-500"
-                    : "border-red-500"
-                  : "border-[var(--color-fourth)]"
+                    ? "border-green-500" // Correct answer
+                    : "border-red-500" // Incorrect answer
+                  : "border-[var(--color-fourth)]" // Default state
               }`}
               placeholder={
                 type === "math"
@@ -161,15 +176,19 @@ export default function QuestionDisplay({
 
   return (
     <div className="space-y-6">
+      {/* Question text */}
       <h3 className="text-xl font-semibold text-[var(--color-fourth)]">
         {question}
       </h3>
 
+      {/* Render the appropriate question type UI */}
       {renderQuestionType()}
 
+      {/* Feedback section after answering */}
       {isAnswered && (
         <div className="space-y-4">
           <div>
+            {/* Correct/incorrect feedback */}
             {isCorrect === true && (
               <div className="text-green-700 font-bold">Correct!</div>
             )}
@@ -179,11 +198,15 @@ export default function QuestionDisplay({
               </div>
             )}
           </div>
+
+          {/* Explanation if provided */}
           {explanation && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-800">{explanation}</p>
             </div>
           )}
+
+          {/* Next question button */}
           <button
             onClick={handleNext}
             className="w-full py-3 px-6 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
