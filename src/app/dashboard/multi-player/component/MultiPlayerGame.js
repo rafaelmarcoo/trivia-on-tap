@@ -278,26 +278,60 @@ export default function MultiPlayerGame() {
     return (
       <div className="min-h-screen bg-[var(--color-primary)] p-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-[var(--color-fourth)] mb-8">
-            Waiting for Players...
-          </h1>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
+              Game Lobby
+            </h1>
+            <button
+              onClick={() => router.push("/dashboard/multi-player")}
+              className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+            >
+              Leave Lobby
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+              {error}
+            </div>
+          )}
+
           {lobbyData && (
             <div className="bg-[var(--color-secondary)] p-6 rounded-lg">
-              <p className="text-white mb-4">
-                Players: {lobbyData.current_players}/{lobbyData.max_players}
-              </p>
-              {lobbyData.host_id === currentUserId && (
-                <button
-                  onClick={() =>
-                    supabase
-                      .from("game_lobbies")
-                      .update({ status: "starting" })
-                      .eq("id", lobbyId)
-                  }
-                  className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90"
-                >
-                  Start Game
-                </button>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-white mb-4">
+                  Players in Lobby
+                </h2>
+                <div className="space-y-2">
+                  {lobbyData.current_players === 0 ? (
+                    <p className="text-gray-300">No players yet</p>
+                  ) : (
+                    <p className="text-white">
+                      Players: {lobbyData.current_players}/{lobbyData.max_players}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {currentUserId === lobbyData.host_id && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await supabase
+                          .from("game_lobbies")
+                          .update({ status: "starting" })
+                          .eq("id", lobbyId);
+                      } catch (error) {
+                        console.error("Error starting game:", error);
+                        setError("Failed to start game");
+                      }
+                    }}
+                    className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90"
+                  >
+                    Start Game
+                  </button>
+                </div>
               )}
             </div>
           )}

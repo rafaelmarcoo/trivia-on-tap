@@ -91,6 +91,7 @@ export default function LobbySystem({ onGameStart }) {
         user_id: user.id
       });
 
+      // Navigate to the lobby
       router.push(`/dashboard/multi-player?lobby=${data.id}`);
     } catch (error) {
       console.error("Error creating lobby:", error);
@@ -129,6 +130,7 @@ export default function LobbySystem({ onGameStart }) {
         .update({ current_players: lobby.current_players + 1 })
         .eq("id", lobbyId);
 
+      // Navigate to the lobby
       router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
     } catch (error) {
       console.error("Error joining lobby:", error);
@@ -139,9 +141,17 @@ export default function LobbySystem({ onGameStart }) {
   return (
     <div className="min-h-screen bg-[var(--color-primary)] p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-[var(--color-fourth)] mb-8">
-          Multiplayer Lobby
-        </h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
+            Multiplayer Lobby
+          </h1>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+          >
+            Back to Dashboard
+          </button>
+        </div>
 
         {error && (
           <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
