@@ -1,12 +1,11 @@
 "use client"; // Next.js directive to mark this as a Client Component
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoLogout, getSupabase } from "@/utils/supabase";
 import QuestionDisplay from "./QuestionDisplay";
 import GameSummary from "@/app/dashboard/components/GameSummary";
 import { generateTriviaQuestions } from "@/utils/openai";
-import { LevelingSystem } from "@/app/leveling/leveling-system";
 import LobbySystem from "./LobbySystem";
 
 // Available quiz categories
@@ -38,8 +37,8 @@ export default function MultiPlayerGame() {
   const [gameSummary, setGameSummary] = useState(null);
   const [gameSessionId, setGameSessionId] = useState(null);
   const [lobbyData, setLobbyData] = useState(null);
-  const [channel, setChannel] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [channel, setChannel] = useState(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -102,6 +101,11 @@ export default function MultiPlayerGame() {
 
       if (error) throw error;
       setLobbyData(data);
+
+      // If lobby is already in progress, initialize the game
+      if (data.status === "in_progress" && data.game_session_id) {
+        await initializeGame(data);
+      }
     } catch (error) {
       console.error("Error fetching lobby data:", error);
       setError("Failed to fetch lobby data");
@@ -216,14 +220,14 @@ export default function MultiPlayerGame() {
     }
   };
 
-  const handleNextQuestion = useCallback(() => {
+  const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
       setTimeLeft(30);
     } else {
       endGame();
     }
-  }, [currentQuestionIndex, questions.length]);
+  };
 
   const endGame = async () => {
     try {
@@ -268,7 +272,7 @@ export default function MultiPlayerGame() {
       handleNextQuestion();
     }
     return () => clearInterval(timer);
-  }, [gameState, timeLeft, isLoading, handleNextQuestion]);
+  }, [gameState, timeLeft, isLoading]);
 
   if (gameState === "selection") {
     return <LobbySystem />;
