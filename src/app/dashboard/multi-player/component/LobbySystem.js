@@ -106,7 +106,6 @@ export default function LobbySystem() {
         .insert({
           lobby_id: lobby.id,
           user_id: user.id,
-          is_host: true,
         });
 
       if (playerError) throw playerError;
@@ -171,7 +170,6 @@ export default function LobbySystem() {
         .insert({
           lobby_id: lobbyId,
           user_id: user.id,
-          is_host: false,
         });
 
       if (playerError) throw playerError;
