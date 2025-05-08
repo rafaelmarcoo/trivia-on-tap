@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoLogout, getSupabase } from "@/utils/supabase";
@@ -26,7 +24,7 @@ function MultiPlayerGame() {
 
   useAutoLogout();
 
-  const [gameState, setGameState] = useState("playing"); // Start directly in 'playing' state
+  const [gameState, setGameState] = useState("playing");
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -35,7 +33,6 @@ function MultiPlayerGame() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
   const [gameSessionId, setGameSessionId] = useState(null);
-  const [userAnswers, setUserAnswers] = useState([]);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -66,7 +63,6 @@ function MultiPlayerGame() {
     setTimeLeft(30);
     setScore(0);
     setCurrentQuestionIndex(0);
-    setUserAnswers([]);
 
     try {
       // Get the current user
@@ -87,25 +83,60 @@ function MultiPlayerGame() {
           game_type: "multi_player",
           user_id: user.id,
           total_questions: 20,
-          categories: categories.map((category) => category.id), // Use all categories
+          categories: categories.map((category) => category.id),
           difficulty_level: parseInt(userLevel),
           time_per_question: 30,
         })
         .select()
         .single();
 
-      if (sessionError) {
-        console.error("Session creation error:", sessionError);
-        throw sessionError;
-      }
-
+      if (sessionError) throw sessionError;
       setGameSessionId(sessionData.id);
 
+      // Generate questions
       const generatedQuestions = await generateTriviaQuestions(
-        categories.map((category) => category.id), // Use all categories
+        categories.map((category) => category.id),
         userLevel
       );
-      setQuestions(generatedQuestions);
+
+      // Store questions in database
+      const { error: insertError } = await supabase
+        .from("game_questions")
+        .insert(
+          generatedQuestions.map((q, index) => ({
+            game_session_id: sessionData.id,
+            question_text: q.question,
+            question_type: q.type,
+            options: q.options,
+            correct_answer: q.correctAnswer,
+            explanation: q.explanation,
+            question_order: index + 1,
+          }))
+        );
+
+      if (insertError) throw insertError;
+
+      // Fetch the questions back from the database to ensure consistency
+      const { data: dbQuestions, error: fetchError } = await supabase
+        .from("game_questions")
+        .select("*")
+        .eq("game_session_id", sessionData.id)
+        .order("question_order", { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      // Map database questions to our expected format
+      const formattedQuestions = dbQuestions.map((q) => ({
+        id: q.id,
+        question: q.question_text,
+        type: q.question_type,
+        options: q.options,
+        correctAnswer: q.correct_answer,
+        explanation: q.explanation,
+        category: q.category,
+      }));
+
+      setQuestions(formattedQuestions);
       setGameState("playing");
     } catch (error) {
       console.error("Error starting game:", error);
@@ -115,32 +146,25 @@ function MultiPlayerGame() {
       setIsLoading(false);
     }
   };
-  //need to insert before answer
+
   const handleAnswer = async (isCorrect, userAnswer) => {
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
 
-    // Save user's answer
-    const currentQ = questions[currentQuestionIndex];
-    const answerData = {
-      game_session_id: gameSessionId,
-      question_text: currentQ.question,
-      question_type: currentQ.type,
-      options: currentQ.options,
-      correct_answer: currentQ.correctAnswer,
-      user_answer: userAnswer,
-      is_correct: isCorrect,
-      time_taken: 30 - timeLeft,
-      question_order: currentQuestionIndex + 1,
-    };
-
-    setUserAnswers((prev) => [...prev, answerData]);
-
     try {
-      await supabase.from("game_questions").insert(answerData);
+      // Update the question in the database with the user's answer
+      await supabase
+        .from("game_questions")
+        .update({
+          user_answer: userAnswer,
+          is_correct: isCorrect,
+          time_taken: 30 - timeLeft,
+          answered_at: new Date().toISOString(),
+        })
+        .eq("id", questions[currentQuestionIndex].id);
     } catch (error) {
-      console.error("Error saving answer:", error);
+      console.error("Error updating answer:", error);
     }
   };
 
@@ -155,18 +179,28 @@ function MultiPlayerGame() {
         })
         .eq("id", gameSessionId);
 
-      // Prepare detailed summary
-      const detailedQuestions = questions.map((q, index) => ({
-        ...q,
-        userAnswer: userAnswers[index]?.user_answer,
-        isCorrect: userAnswers[index]?.is_correct,
-      }));
+      // Get all questions with user answers for the summary
+      const { data: answeredQuestions, error: fetchError } = await supabase
+        .from("game_questions")
+        .select("*")
+        .eq("game_session_id", gameSessionId)
+        .order("question_order", { ascending: true });
+
+      if (fetchError) throw fetchError;
 
       setGameSummary({
         score,
         totalQuestions: questions.length,
-        categories: categories.map((category) => category.name), // Use all categories
-        questions: detailedQuestions,
+        categories: categories.map((category) => category.name),
+        questions: answeredQuestions.map((q) => ({
+          ...q,
+          question: q.question_text,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          explanation: q.explanation,
+          userAnswer: q.user_answer,
+          isCorrect: q.is_correct,
+        })),
       });
       setGameState("summary");
     } catch (error) {
@@ -175,7 +209,6 @@ function MultiPlayerGame() {
     }
   };
 
-  // Start the game automatically
   useEffect(() => {
     startGame();
   }, []);
