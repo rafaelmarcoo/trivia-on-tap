@@ -110,11 +110,8 @@ export default function LobbySystem() {
 
       if (playerError) throw playerError;
 
-      // Wait a moment to ensure all database operations are complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       // Navigate to the lobby
-      router.push(`/dashboard/multi-player?lobby=${lobby.id}`);
+      window.location.href = `/dashboard/multi-player?lobby=${lobby.id}`;
     } catch (error) {
       console.error("Error creating lobby:", error);
       setError(error.message || "Failed to create lobby");
@@ -185,14 +182,50 @@ export default function LobbySystem() {
 
       if (updateError) throw updateError;
 
-      // Wait a moment to ensure all database operations are complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       // Navigate to the lobby
-      router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
+      window.location.href = `/dashboard/multi-player?lobby=${lobbyId}`;
     } catch (error) {
       console.error("Error joining lobby:", error);
       setError(error.message || "Failed to join lobby");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startGame = async (lobbyId) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error("User not authenticated");
+
+      // Get lobby data
+      const { data: lobby, error: lobbyError } = await supabase
+        .from("game_lobbies")
+        .select("*")
+        .eq("id", lobbyId)
+        .single();
+
+      if (lobbyError) throw lobbyError;
+
+      // Check if user is the host
+      if (lobby.host_id !== user.id) {
+        throw new Error("Only the host can start the game");
+      }
+
+      // Update lobby status to starting
+      const { error: updateError } = await supabase
+        .from("game_lobbies")
+        .update({ status: "starting" })
+        .eq("id", lobbyId);
+
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error("Error starting game:", error);
+      setError(error.message || "Failed to start game");
     } finally {
       setIsLoading(false);
     }
@@ -249,13 +282,25 @@ export default function LobbySystem() {
                       Created: {new Date(lobby.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <button
-                    onClick={() => joinLobby(lobby.id)}
-                    disabled={isLoading || lobby.current_players >= lobby.max_players}
-                    className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-                  >
-                    {isLoading ? "Joining..." : "Join"}
-                  </button>
+                  <div className="flex gap-2">
+                    {currentUserId === lobby.host_id ? (
+                      <button
+                        onClick={() => startGame(lobby.id)}
+                        disabled={isLoading || lobby.current_players < 2}
+                        className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
+                      >
+                        Start Game
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => joinLobby(lobby.id)}
+                        disabled={isLoading}
+                        className="bg-[var(--color-fourth)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
+                      >
+                        Join
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

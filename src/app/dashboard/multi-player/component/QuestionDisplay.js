@@ -2,17 +2,6 @@
 
 import { useState } from "react";
 
-/**
- * A component that displays a question and handles user answers
- * @param {string} type - The type of question ('multiple-choice', 'true-false', 'one-word', 'math')
- * @param {string} question - The question text
- * @param {string[]} options - Array of answer options (for multiple-choice/true-false)
- * @param {string} correctAnswer - The correct answer
- * @param {string} explanation - Explanation of the answer
- * @param {function} onAnswer - Callback when user answers (receives isCorrect, answer)
- * @param {function} onNextQuestion - Callback to move to next question
- * @param {boolean} isLastQuestion - Flag if this is the last question
- */
 export default function QuestionDisplay({
   type,
   question,
@@ -46,10 +35,6 @@ export default function QuestionDisplay({
     onAnswer(correct, answer);
   };
 
-  /**
-   * Handles submission of input answer (for one-word/math questions)
-   * @param {Event} e - Form submission event
-   */
   const handleInputAnswer = (e) => {
     e.preventDefault();
     if (isAnswered) return; // Prevent answering again
@@ -73,9 +58,6 @@ export default function QuestionDisplay({
     onAnswer(correct, userInput);
   };
 
-  /**
-   * Resets state and moves to next question
-   */
   const handleNext = () => {
     setSelectedAnswer(null);
     setIsAnswered(false);
@@ -83,10 +65,6 @@ export default function QuestionDisplay({
     onNextQuestion();
   };
 
-  /**
-   * Renders the appropriate question type UI
-   * @returns {JSX.Element} The question input component
-   */
   const renderQuestionType = () => {
     switch (type) {
       case "multiple-choice":
