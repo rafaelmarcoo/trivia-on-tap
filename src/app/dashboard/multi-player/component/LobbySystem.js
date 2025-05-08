@@ -110,6 +110,9 @@ export default function LobbySystem() {
 
       if (playerError) throw playerError;
 
+      // Wait a moment to ensure all database operations are complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Navigate to the lobby
       router.push(`/dashboard/multi-player?lobby=${lobby.id}`);
     } catch (error) {
@@ -182,6 +185,9 @@ export default function LobbySystem() {
 
       if (updateError) throw updateError;
 
+      // Wait a moment to ensure all database operations are complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Navigate to the lobby
       router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
     } catch (error) {
@@ -199,13 +205,21 @@ export default function LobbySystem() {
           <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
             Multiplayer Lobbies
           </h1>
-          <button
-            onClick={createLobby}
-            disabled={isLoading}
-            className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-          >
-            {isLoading ? "Creating..." : "Create Lobby"}
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+            >
+              Back to Dashboard
+            </button>
+            <button
+              onClick={createLobby}
+              disabled={isLoading}
+              className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
+            >
+              {isLoading ? "Creating..." : "Create Lobby"}
+            </button>
+          </div>
         </div>
 
         {error && (

@@ -109,6 +109,8 @@ export default function MultiPlayerGame() {
     } catch (error) {
       console.error("Error fetching lobby data:", error);
       setError("Failed to fetch lobby data");
+      // If there's an error, redirect back to lobby list
+      router.push("/dashboard/multi-player");
     }
   };
 
@@ -286,37 +288,45 @@ export default function MultiPlayerGame() {
             <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
               Game Lobby
             </h1>
-            <button
-              onClick={async () => {
-                try {
-                  // Remove player from lobby
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (user) {
-                    await supabase
-                      .from("game_lobby_players")
-                      .delete()
-                      .eq("lobby_id", lobbyId)
-                      .eq("user_id", user.id);
+            <div className="flex gap-4">
+              <button
+                onClick={() => router.push("/dashboard/multi-player")}
+                className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+              >
+                Back to Lobbies
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    // Remove player from lobby
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      await supabase
+                        .from("game_lobby_players")
+                        .delete()
+                        .eq("lobby_id", lobbyId)
+                        .eq("user_id", user.id);
 
-                    // Update player count
-                    await supabase
-                      .from("game_lobbies")
-                      .update({ 
-                        current_players: lobbyData.current_players - 1,
-                        status: lobbyData.current_players <= 1 ? "completed" : "waiting"
-                      })
-                      .eq("id", lobbyId);
+                      // Update player count
+                      await supabase
+                        .from("game_lobbies")
+                        .update({ 
+                          current_players: lobbyData.current_players - 1,
+                          status: lobbyData.current_players <= 1 ? "completed" : "waiting"
+                        })
+                        .eq("id", lobbyId);
+                    }
+                    router.push("/dashboard/multi-player");
+                  } catch (error) {
+                    console.error("Error leaving lobby:", error);
+                    setError("Failed to leave lobby");
                   }
-                  router.push("/dashboard/multi-player");
-                } catch (error) {
-                  console.error("Error leaving lobby:", error);
-                  setError("Failed to leave lobby");
-                }
-              }}
-              className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
-            >
-              Leave Lobby
-            </button>
+                }}
+                className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
+              >
+                Leave Lobby
+              </button>
+            </div>
           </div>
 
           {error && (
