@@ -108,7 +108,6 @@ export default function Dashboard() {
           Logout
         </button>
       </div>
-
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
           <h1 className="text-4xl font-bold text-[var(--color-fourth)]">
@@ -133,6 +132,13 @@ export default function Dashboard() {
           >
             <span className="text-xl">👥</span>
             <span>Multiplayer Mode</span>
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/game-history")}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+          >
+            <span className="text-xl">📊</span>
+            <span>Game History</span>
           </button>
           <button
             onClick={() => router.push("/dashboard/tutorial")}
