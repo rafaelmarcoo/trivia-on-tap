@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [userLevel, setUserLevel] = useState(null)
   const [userName, setUserName] = useState("")
   const [profileImage, setProfileImage] = useState(null)
+  const [status, setStatus] = useState("")
   const router = useRouter()
   const supabase = getSupabase()
 
@@ -35,7 +36,7 @@ export default function Dashboard() {
 
       const { data: userData, error: userError } = await supabase
         .from("user") 
-        .select("user_name, user_level")
+        .select("user_name, user_level, status")
         .eq("auth_id", user.id)
         .single()
 
@@ -44,6 +45,7 @@ export default function Dashboard() {
       if (userData) {
         setUserName(userData.user_name || "")
         setUserLevel(userData.user_level || 1)
+        setStatus(userData.status || "Feeling smart!")
       }
     } catch (error) {
       console.error("Error fetching user data:", error)
@@ -108,6 +110,14 @@ export default function Dashboard() {
           Logout
         </button>
       </div>
+      {status && (
+        <div className="absolute top-24 left-6 bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-lg max-w-xs">
+          <div className="relative">
+            <div className="absolute -top-2 left-4 w-4 h-4 bg-white/90 transform rotate-45"></div>
+            <p className="text-[var(--color-fourth)] text-sm">{status}</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4">
         <div className="text-center space-y-4 mb-12">
           <h1 className="text-4xl font-bold text-[var(--color-fourth)]">
