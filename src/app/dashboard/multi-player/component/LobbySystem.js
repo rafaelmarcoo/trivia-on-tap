@@ -21,7 +21,7 @@ export default function LobbySystem({ onGameStart }) {
           event: "*",
           schema: "public",
           table: "game_lobbies",
-          filter: "status=eq.waiting"
+          filter: "status=eq.waiting",
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
@@ -69,8 +69,11 @@ export default function LobbySystem({ onGameStart }) {
     try {
       setIsCreatingLobby(true);
       setError(null);
-      
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error("Not authenticated");
 
@@ -81,7 +84,7 @@ export default function LobbySystem({ onGameStart }) {
           host_id: user.id,
           status: "waiting",
           max_players: 2,
-          current_players: 1
+          current_players: 1,
         })
         .select()
         .single();
@@ -93,7 +96,7 @@ export default function LobbySystem({ onGameStart }) {
         .from("game_lobby_players")
         .insert({
           lobby_id: lobbyData.id,
-          user_id: user.id
+          user_id: user.id,
         });
 
       if (joinError) throw joinError;
@@ -111,8 +114,11 @@ export default function LobbySystem({ onGameStart }) {
   const joinLobby = async (lobbyId) => {
     try {
       setError(null);
-      
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error("Not authenticated");
 
@@ -124,7 +130,8 @@ export default function LobbySystem({ onGameStart }) {
         .eq("user_id", user.id)
         .single();
 
-      if (checkError && checkError.code !== "PGRST116") { // PGRST116 is "no rows returned"
+      if (checkError && checkError.code !== "PGRST116") {
+        // PGRST116 is "no rows returned"
         throw checkError;
       }
 
@@ -142,15 +149,17 @@ export default function LobbySystem({ onGameStart }) {
         .single();
 
       if (lobbyError) throw lobbyError;
-      if (lobby.status !== "waiting") throw new Error("Lobby is no longer available");
-      if (lobby.current_players >= lobby.max_players) throw new Error("Lobby is full");
+      if (lobby.status !== "waiting")
+        throw new Error("Lobby is no longer available");
+      if (lobby.current_players >= lobby.max_players)
+        throw new Error("Lobby is full");
 
       // Join the lobby
       const { error: joinError } = await supabase
         .from("game_lobby_players")
         .insert({
           lobby_id: lobbyId,
-          user_id: user.id
+          user_id: user.id,
         });
 
       if (joinError) throw joinError;
@@ -235,4 +244,4 @@ export default function LobbySystem({ onGameStart }) {
       </div>
     </div>
   );
-} 
+}

@@ -114,7 +114,10 @@ export default function MultiPlayerGame() {
       setError(null);
 
       // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error("User not authenticated");
 
@@ -286,7 +289,9 @@ export default function MultiPlayerGame() {
               onClick={async () => {
                 try {
                   // Remove player from lobby
-                  const { data: { user } } = await supabase.auth.getUser();
+                  const {
+                    data: { user },
+                  } = await supabase.auth.getUser();
                   if (user) {
                     await supabase
                       .from("game_lobby_players")
@@ -297,9 +302,12 @@ export default function MultiPlayerGame() {
                     // Update player count
                     await supabase
                       .from("game_lobbies")
-                      .update({ 
+                      .update({
                         current_players: lobbyData.current_players - 1,
-                        status: lobbyData.current_players <= 1 ? "completed" : "waiting"
+                        status:
+                          lobbyData.current_players <= 1
+                            ? "completed"
+                            : "waiting",
                       })
                       .eq("id", lobbyId);
                   }
@@ -332,7 +340,8 @@ export default function MultiPlayerGame() {
                     <p className="text-gray-300">No players yet</p>
                   ) : (
                     <p className="text-white">
-                      Players: {lobbyData.current_players}/{lobbyData.max_players}
+                      Players: {lobbyData.current_players}/
+                      {lobbyData.max_players}
                     </p>
                   )}
                 </div>
@@ -367,7 +376,9 @@ export default function MultiPlayerGame() {
                     disabled={lobbyData.current_players < 1}
                     className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
                   >
-                    {lobbyData.current_players < 1 ? "Waiting for Players..." : "Start Game"}
+                    {lobbyData.current_players < 1
+                      ? "Waiting for Players..."
+                      : "Start Game"}
                   </button>
                 </div>
               )}
