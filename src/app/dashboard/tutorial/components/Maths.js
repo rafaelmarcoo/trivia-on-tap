@@ -1,11 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function Maths() {
+export default function Maths({ onComplete }) {
   const [answer, setAnswer] = useState("");
-  const router  = useRouter();
 
   const handleChange = (e) => {
     setAnswer(e.target.value);
@@ -17,60 +15,74 @@ export default function Maths() {
   };
 
   return (
-    <div className="space-y-4">
-
-      <h2 className="text-xl text-red-500">
-        MATHS QUESTION WILL BE DISPLAYED HERE
-      </h2>
-      <h3 className="text-xl mb-4 font-semibold text-red-500 text-center">
-        ENTER YOUR ANSWER BELOW
-        <p className="text-4xl text-center mb-8 text-red-500">↓</p>
-      </h3>
-
-      <input
-        type="text"
-        value={answer}
-        onChange={handleChange}
-        className="w-full p-4 rounded-lg border-2 bg-[var(--color-primary)] border-[var(--color-fourth)]"
-        placeholder="Enter your answer (numbers only)"
-      />
-
-      <button
-        onClick={handleSubmit}
-        disabled={answer.trim() === ""}
-        className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors ${
-          answer.trim() !== ""
-            ? "bg-[var(--color-tertiary)] text-[var(--color-primary)] hover:bg-opacity-90"
-            : "bg-[var(--color-tertiary)] text-[var(--color-primary)] opacity-50 cursor-not-allowed"
-        }`}
-      >
-        Submit Answer
-      </button>
-
-      {/* Example result display sections */}
-      <div className="flex flex-col items-center">
-        <span className="text-sm text-center mb-1">
-          IF YOU GET THE CORRECT ANSWER THEN THIS WILL BE DISPLAYED BELOW
-        </span>
-        <p className="text-2xl text-black-500">↓</p>
-        <div className="text-green-700 font-bold">Correct!</div>
-      </div>
-
-      <div className="flex flex-col items-center">
-        <span className="text-sm text-center mb-1">
-          IF YOU GET THE WRONG ANSWER THEN THIS WILL BE DISPLAYED BELOW
-        </span>
-        <p className="text-2xl text-black-500">↓</p>
-        <div className="text-red-700 font-bold">
-          Incorrect. The correct answer was: _________
+    <div className="space-y-8">
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-semibold">1</span>
+          <h2 className="text-2xl font-semibold text-gray-800">Sample Question</h2>
         </div>
-      </div>
-      <button
-            onClick={() => router.push('/dashboard/')}
-            className="w-full py-3 px-6 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors mt-8"
+        <p className="text-gray-600 mb-6 pl-11">
+          The question will be displayed here during the actual quiz.
+          Enter your numerical answer in the field below.
+        </p>
+
+        <div className="pl-11 space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="answer" className="block text-sm font-medium text-gray-700">
+              Your Answer
+            </label>
+            <input
+              id="answer"
+              type="text"
+              value={answer}
+              onChange={handleChange}
+              className="w-full p-4 rounded-lg border border-gray-200 bg-white focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors"
+              placeholder="Enter your numerical answer"
+            />
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={answer.trim() === ""}
+            className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
+              answer.trim() !== ""
+                ? "bg-gray-800 text-white hover:bg-gray-700"
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            }`}
           >
-            END TUTORIAL
+            Submit Answer
           </button>
+        </div>
+      </section>
+
+      <section className="space-y-6 bg-gray-50 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-800 mb-4">How it works:</h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex-1">
+              <p className="text-green-800 font-medium">Correct Answer</p>
+              <p className="text-green-600 text-sm">Your answer matches the expected result</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="flex-1">
+              <p className="text-red-800 font-medium">Incorrect Answer</p>
+              <p className="text-red-600 text-sm">The correct answer was: [answer]</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <button
+          onClick={onComplete}
+          className="w-full py-4 px-8 rounded-lg text-lg bg-gray-800 hover:bg-gray-700 text-white font-medium transition-colors shadow-md"
+        >
+          Complete Tutorial
+        </button>
+      </section>
     </div>
   );
 }
