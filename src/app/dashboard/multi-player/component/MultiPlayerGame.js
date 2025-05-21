@@ -70,11 +70,6 @@ export default function MultiPlayerGame() {
           if (payload.eventType === "UPDATE") {
             const updatedLobby = payload.new;
             setLobbyData(updatedLobby);
-
-            // If lobby status changed to starting, initialize the game
-            if (updatedLobby.status === "starting" && !gameSessionId) {
-              await initializeGame(updatedLobby);
-            }
           }
         }
       )
@@ -272,6 +267,118 @@ export default function MultiPlayerGame() {
     }
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
+
+  // Matchmaking effect
+  useEffect(() => {
+    const matchmake = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Get current user
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error("Not authenticated");
+
+        // Try to find a lobby with 1 player and status 'waiting'
+        const { data: lobbies, error: findError } = await supabase
+          .from("game_lobbies")
+          .select("*")
+          .eq("status", "waiting")
+          .eq("current_players", 1)
+          .limit(1);
+
+        let lobby;
+        if (findError) throw findError;
+
+        if (lobbies && lobbies.length > 0) {
+          // Join the existing lobby
+          lobby = lobbies[0];
+          await supabase.from("game_lobby_players").insert({
+            lobby_id: lobby.id,
+            user_id: user.id,
+          });
+          // Update lobby to 2 players and set status to 'starting'
+          await supabase
+            .from("game_lobbies")
+            .update({ current_players: 2, status: "starting" })
+            .eq("id", lobby.id);
+          setLobbyId(lobby.id);
+        } else {
+          // Create a new lobby
+          const { data: newLobby, error: createError } = await supabase
+            .from("game_lobbies")
+            .insert({
+              host_id: user.id,
+              status: "waiting",
+              max_players: 2,
+              current_players: 1,
+            })
+            .select()
+            .single();
+          if (createError) throw createError;
+
+          await supabase.from("game_lobby_players").insert({
+            lobby_id: newLobby.id,
+            user_id: user.id,
+          });
+          setLobbyId(newLobby.id);
+        }
+      } catch (error) {
+        setError(error.message || "Matchmaking failed");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Only matchmake if not already in a lobby
+    if (!lobbyId) {
+      matchmake();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobbyId]);
+
+  // Listen for lobby status change to start game automatically
+  useEffect(() => {
+    if (
+      lobbyData &&
+      (lobbyData.status === "starting" || lobbyData.status === "in_progress") &&
+      gameState !== "playing"
+    ) {
+      const fetchQuestionsAndStart = async () => {
+        try {
+          setIsLoading(true);
+          const { data: dbQuestions, error: fetchError } = await supabase
+            .from("game_questions")
+            .select("*")
+            .eq("game_session_id", lobbyData.game_session_id)
+            .order("question_order", { ascending: true });
+
+          if (fetchError) throw fetchError;
+
+          const formattedQuestions = dbQuestions.map((q) => ({
+            id: q.id,
+            question: q.question_text,
+            type: q.question_type,
+            options: q.options,
+            correctAnswer: q.correct_answer,
+          }));
+
+          setQuestions(formattedQuestions);
+          setGameState("playing");
+        } catch (error) {
+          setError("Failed to start game");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchQuestionsAndStart();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lobbyData?.status]);
 
   if (gameState === "selection") {
     return <LobbySystem />;
