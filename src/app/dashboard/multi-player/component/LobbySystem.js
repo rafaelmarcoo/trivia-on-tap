@@ -7,8 +7,38 @@ import { getSupabase } from "@/utils/supabase";
 export default function LobbySystem() {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [waitingPlayers, setWaitingPlayers] = useState([]);
   const supabase = getSupabase();
   const router = useRouter();
+
+  // Subscribe to waiting_players table in realtime
+  useEffect(() => {
+    let channel;
+    const fetchWaitingPlayers = async () => {
+      const { data, error } = await supabase
+        .from("waiting_players")
+        .select("*");
+      if (!error) setWaitingPlayers(data || []);
+    };
+
+    fetchWaitingPlayers();
+
+    channel = supabase
+      .channel("public:waiting_players")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "waiting_players" },
+        (payload) => {
+          fetchWaitingPlayers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,6 +56,39 @@ export default function LobbySystem() {
         } = await supabase.auth.getUser();
         if (userError || !user) throw new Error("Not authenticated");
 
+        // Check if already in waiting_players
+        const { data: alreadyWaiting } = await supabase
+          .from("waiting_players")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+
+        if (!alreadyWaiting) {
+          // Add yourself to waiting_players
+          const { data: insertData, error: insertError } = await supabase
+            .from("waiting_players")
+            .insert({ user_id: user.id })
+            .select()
+            .single();
+
+          if (insertError) {
+            setError("Failed to join matchmaking: " + insertError.message);
+            console.error("Supabase insert error:", insertError);
+            return;
+          }
+          if (!insertData) {
+            setError(
+              "Insert succeeded but no data returned. Check Supabase policies."
+            );
+            return;
+          }
+          // For debugging: log the inserted row
+          console.log("Inserted into waiting_players:", insertData);
+
+          setIsLoading(false);
+          return; // Wait for next poll to look for a match
+        }
+
         // Try to find another waiting player (not yourself)
         const { data: waitingPlayers, error: waitingError } = await supabase
           .from("waiting_players")
@@ -39,11 +102,11 @@ export default function LobbySystem() {
           // Found another waiting player, create a lobby and assign both
           const otherPlayer = waitingPlayers[0];
 
-          // Remove the other player from waiting list
+          // Remove both players from waiting list
           await supabase
             .from("waiting_players")
             .delete()
-            .eq("user_id", otherPlayer.user_id);
+            .in("user_id", [otherPlayer.user_id, user.id]);
 
           // Create a new lobby
           const { data: newLobby, error: createError } = await supabase
@@ -58,11 +121,12 @@ export default function LobbySystem() {
             .single();
           if (createError) throw createError;
 
-          // Create a new game session
+          // Create a new game session (make sure to set game_type)
           const { data: newSession, error: sessionError } = await supabase
             .from("game_sessions")
             .insert({
               lobby_id: newLobby.id,
+              game_type: "multiplayer",
             })
             .select()
             .single();
@@ -102,26 +166,9 @@ export default function LobbySystem() {
             { lobby_id: newLobby.id, user_id: user.id },
           ]);
 
-          // Remove yourself from waiting list (if present)
-          await supabase
-            .from("waiting_players")
-            .delete()
-            .eq("user_id", user.id);
-
-          // Redirect to the lobby
+          // Redirect to the lobby/game
           if (isMounted)
             router.push(`/dashboard/multi-player?lobby=${newLobby.id}`);
-        } else {
-          // No waiting player, add yourself to waiting list if not already there
-          const { data: alreadyWaiting } = await supabase
-            .from("waiting_players")
-            .select("*")
-            .eq("user_id", user.id)
-            .single();
-
-          if (!alreadyWaiting) {
-            await supabase.from("waiting_players").insert({ user_id: user.id });
-          }
         }
       } catch (error) {
         setError(error.message || "Matchmaking failed");
@@ -136,7 +183,6 @@ export default function LobbySystem() {
     return () => {
       isMounted = false;
       clearInterval(intervalId);
-      // Optionally: remove user from waiting_players on unmount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -157,6 +203,17 @@ export default function LobbySystem() {
             {error}
           </div>
         )}
+        {/* Show waiting players for debugging */}
+        <div className="mt-4">
+          <h2 className="text-lg text-[var(--color-fourth)] mb-2">
+            Waiting Players:
+          </h2>
+          <ul className="text-white">
+            {waitingPlayers.map((p) => (
+              <li key={p.user_id}>{p.user_id}</li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
