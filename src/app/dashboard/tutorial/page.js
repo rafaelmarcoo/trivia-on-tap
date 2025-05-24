@@ -53,7 +53,7 @@ export default function TutorialPage() {
                 <h2 className="text-2xl font-semibold text-gray-800">Choose Your Categories</h2>
               </div>
               <p className="text-gray-600 mb-6 pl-11">
-                Select one or more categories below that you'd like to be quizzed on. 
+                Select one or more categories below that you&apos;d like to be quizzed on. 
                 Mix and match to create your perfect trivia experience!
               </p>
               <div className="pl-11">
