@@ -4,9 +4,6 @@ export const handleLogout = async (router) => {
   try {
     const supabase = getSupabase()
     
-    // Clear any local storage items
-    localStorage.removeItem('profileImage')
-    
     // Sign out from Supabase
     const { error } = await supabase.auth.signOut()
     if (error) throw error

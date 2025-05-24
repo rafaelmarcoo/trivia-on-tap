@@ -22,31 +22,73 @@ export default function UserProfile() {
   const supabase = getSupabase()
 
 
-  useEffect(() => {
-    const savedImage = localStorage.getItem('profileImage');
-    if (savedImage) {
-      setProfileImage(savedImage);
-    }
-  }, []);
-
   const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
+    const file = e.target.files[0]
+    if (!file) return
 
     if (!file.type.match('image.*')) {
-      alert('Please select an image file');
-      return;
+      alert('Please select an image file')
+      return
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageUrl = event.target.result;
-      setProfileImage(imageUrl);
-      localStorage.setItem('profileImage', imageUrl);
-    };
-    reader.readAsDataURL(file);
-  };
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No user found')
+
+      // Upload image to Supabase Storage
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      // Get public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(fileName)
+
+      // Update user profile with the new image URL
+      const { error: updateError } = await supabase
+        .from('user')
+        .update({ profile_image: publicUrl })
+        .eq('auth_id', user.id)
+
+      if (updateError) throw updateError
+
+      setProfileImage(publicUrl)
+    } catch (error) {
+      console.error('Error updating profile image:', error)
+      alert('Failed to update profile image')
+    }
+  }
+
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: userData } = await supabase
+            .from('user')
+            .select('profile_image')
+            .eq('auth_id', user.id)
+            .single()
+
+          if (userData?.profile_image) {
+            setProfileImage(userData.profile_image)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile image:', error)
+      }
+    }
+
+    loadProfileImage()
+  }, [supabase])
 
   const getUser = useCallback(async () => {
     const { isAuthenticated, session } = await checkAuth()

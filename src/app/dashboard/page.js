@@ -22,11 +22,27 @@ export default function Dashboard() {
   })
 
   useEffect(() => {
-    const savedImage = localStorage.getItem('profileImage')
-    if (savedImage) {
-      setProfileImage(savedImage)
+    const loadProfileImage = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: userData } = await supabase
+            .from('user')
+            .select('profile_image')
+            .eq('auth_id', user.id)
+            .single()
+
+          if (userData?.profile_image) {
+            setProfileImage(userData.profile_image)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile image:', error)
+      }
     }
-  }, [])
+
+    loadProfileImage()
+  }, [supabase])
 
   const getUser = useCallback(async () => {
     try {
