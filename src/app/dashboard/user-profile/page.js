@@ -39,7 +39,7 @@ export default function UserProfile() {
       const fileExt = file.name.split('.').pop()
       const fileName = `${user.id}-${Date.now()}.${fileExt}`
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-images')
+        .from('profile-image')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true
@@ -49,7 +49,7 @@ export default function UserProfile() {
 
       // Get public URL for the uploaded image
       const { data: { publicUrl } } = supabase.storage
-        .from('profile-images')
+        .from('profile-image')
         .getPublicUrl(fileName)
 
       // Update user profile with the new image URL
