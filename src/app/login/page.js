@@ -2,30 +2,25 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSupabase } from '@/utils/supabase'
+import { handleLogin } from '@/utils/auth'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const supabase = getSupabase()
 
-  const handleLogin = async (e) => {
+  const onLogin = async (e) => {
     e.preventDefault()
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      
-      if (error) throw error
-      
-      // Force a router refresh to update the session
-      router.refresh()
-      router.push('/dashboard')
-    } catch (error) {
-      setError(error.message)
+    setIsLoading(true)
+    setError(null)
+
+    const { success, error } = await handleLogin(email, password, router)
+    
+    if (!success) {
+      setError(error)
+      setIsLoading(false)
     }
   }
 
@@ -37,7 +32,7 @@ export default function Login() {
           <p className="text-[var(--color-fourth)]/80">have a beer have a trivia</p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="mt-8 space-y-6" onSubmit={onLogin}>
           {error && (
             <div className="text-red-600 text-sm text-center">
               {error}
@@ -58,6 +53,7 @@ export default function Login() {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
@@ -74,11 +70,15 @@ export default function Login() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
-            <div className="text-right">
-              <Link href="/forgot-password" className="text-sm text-[var(--color-tertiary)] hover:text-[var(--color-fourth)] transition-colors">
+            <div className="flex justify-end">
+              <Link 
+                href="/forgot-password" 
+                className="text-sm text-[var(--color-tertiary)] hover:text-[var(--color-fourth)] transition-colors"
+              >
                 Forgot password?
               </Link>
             </div>
@@ -87,9 +87,10 @@ export default function Login() {
           <div>
             <button
               type="submit"
-              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02]"
+              disabled={isLoading}
+              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Login
+              {isLoading ? 'Logging in...' : 'Login'}
             </button>
           </div>
         </form>

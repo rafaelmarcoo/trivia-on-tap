@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/utils/supabase'
 import { ArrowLeft, LogOut, Camera, User, Pencil } from 'lucide-react'
+import { handleLogout, checkAuth } from "@/utils/auth"
 
 export default function UserProfile() {
   const [user, setUser] = useState(null)
@@ -48,44 +49,41 @@ export default function UserProfile() {
   };
 
   const getUser = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/login');
+    const { isAuthenticated, session } = await checkAuth()
+    if (!isAuthenticated) {
+      router.push('/login')
     } else {
-      setUser(user);
-      setJoinedDate(new Date(user.created_at).toLocaleDateString());
+      setUser(session.user)
+      setJoinedDate(new Date(session.user.created_at).toLocaleDateString())
 
       const { data, error } = await supabase
         .from('user')
         .select('user_name, user_level, status')
-        .eq('auth_id', user.id)
-        .single();
+        .eq('auth_id', session.user.id)
+        .single()
       
       if (!error && data) {
-        setUserName(data.user_name);
-        setUserLevel(data.user_level);
-        setStatus(data.status || 'Feeling smart!');
+        setUserName(data.user_name)
+        setUserLevel(data.user_level)
+        setStatus(data.status || 'Feeling smart!')
       }
     }
-  }, [router, supabase]);
+  }, [router, supabase])
 
   useEffect(() => {
-    getUser();
-  }, [getUser]);
+    getUser()
+  }, [getUser])
 
-
-  const handleLogout = async () => {
+  const onLogout = async () => {
     try {
-      setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.push('/login');
+      setIsLoggingOut(true)
+      const { success, error } = await handleLogout(router)
+      if (!success) throw new Error(error)
     } catch (err) {
-      console.error('Logout failed:', err.message);
-    } finally {
-      setIsLoggingOut(false);
+      console.error('Logout failed:', err.message)
+      setIsLoggingOut(false)
     }
-  };
+  }
 
   const updateStatus = async (newStatus) => {
     if (!user) return;
@@ -119,7 +117,11 @@ export default function UserProfile() {
             <ArrowLeft size={18} />
             <span>Back</span>
           </button>
-          <button onClick={handleLogout} disabled={isLoggingOut} className="text-red-600">
+          <button 
+            onClick={onLogout} 
+            disabled={isLoggingOut} 
+            className="text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {isLoggingOut ? 'Logging Out...' : 'Logout'}
           </button>
         </div>

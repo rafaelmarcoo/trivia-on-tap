@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabase, useAutoLogout } from "@/utils/supabase"
+import { handleLogout, checkAuth } from "@/utils/auth"
 import { User } from "lucide-react"
 
 export default function Dashboard() {
@@ -10,10 +11,15 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("")
   const [profileImage, setProfileImage] = useState(null)
   const [status, setStatus] = useState("")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
   const supabase = getSupabase()
 
-  useAutoLogout()
+  useAutoLogout({
+    onLogout: () => {
+      router.push('/login')
+    }
+  })
 
   useEffect(() => {
     const savedImage = localStorage.getItem('profileImage')
@@ -24,20 +30,19 @@ export default function Dashboard() {
 
   const getUser = useCallback(async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      const { isAuthenticated, session } = await checkAuth()
       
-      if (authError) throw authError
-      if (!user) {
+      if (!isAuthenticated) {
         router.push("/login")
         return
       }
 
-      setUser(user)
+      setUser(session.user)
 
       const { data: userData, error: userError } = await supabase
         .from("user") 
         .select("user_name, user_level, status")
-        .eq("auth_id", user.id)
+        .eq("auth_id", session.user.id)
         .single()
 
       if (userError) throw userError
@@ -56,15 +61,14 @@ export default function Dashboard() {
     getUser()
   }, [getUser])
 
-  const handleLogout = async () => {
+  const onLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      router.refresh()
-      router.push("/login")
+      setIsLoggingOut(true)
+      const { success, error } = await handleLogout(router)
+      if (!success) throw new Error(error)
     } catch (error) {
       console.error("Error logging out:", error.message)
+      setIsLoggingOut(false)
     }
   }
 
@@ -103,11 +107,12 @@ export default function Dashboard() {
         <button
           onClick={(e) => {
             e.stopPropagation()
-            handleLogout()
+            onLogout()
           }}
-          className="text-sm text-red-600 transfrom hover:text-red-800 transition-colors duration-200 ml-auto"
+          disabled={isLoggingOut}
+          className="text-sm text-red-600 transform hover:text-red-800 transition-colors duration-200 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Logout
+          {isLoggingOut ? 'Logging out...' : 'Logout'}
         </button>
       </div>
       {status && (
