@@ -32,7 +32,7 @@ export default function ForgotPassword() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[var(--color-fourth)]">Reset Password</h1>
           <p className="text-[var(--color-fourth)]/80 mt-2">
-            Enter your email address and we'll send you instructions to reset your password.
+            Enter your email address and we&apos;ll send you instructions to reset your password.
           </p>
         </div>
 
