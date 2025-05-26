@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSupabase } from '@/utils/supabase'
+import { handleRegister } from '@/utils/auth'
 
 export default function Register() {
   const [username, setUsername] = useState('')
@@ -11,37 +11,32 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const supabase = getSupabase()
 
-  const handleRegister = async (e) => {
+  const onRegister = async (e) => {
     e.preventDefault()
     if (password !== confirmPassword) {
       setError("Passwords don't match")
       return
     }
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username: username,
-          },
-          emailRedirectTo: `${window.location.origin}/login`
-        }
-      })
-      
-      if (error) throw error
-      
-      setError(null)
+
+    setIsLoading(true)
+    setError(null)
+
+    const { success, error, message } = await handleRegister(email, password, username, router)
+    
+    if (success) {
       setSuccess(true)
+      setError(null)
       setTimeout(() => {
         router.push('/login')
       }, 3000)
-    } catch (error) {
-      setError(error.message)
+    } else {
+      setError(error)
     }
+    
+    setIsLoading(false)
   }
 
   return (
@@ -62,7 +57,7 @@ export default function Register() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleRegister}>
+        <form className="mt-8 space-y-6" onSubmit={onRegister}>
           {error && (
             <div className="text-red-600 text-sm text-center">
               {error}
@@ -83,6 +78,7 @@ export default function Register() {
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
@@ -99,6 +95,7 @@ export default function Register() {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
@@ -115,6 +112,7 @@ export default function Register() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
 
@@ -131,6 +129,7 @@ export default function Register() {
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -138,9 +137,10 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02]"
+              disabled={isLoading}
+              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign up
+              {isLoading ? 'Signing up...' : 'Sign up'}
             </button>
           </div>
         </form>

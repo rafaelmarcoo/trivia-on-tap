@@ -1,27 +1,27 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSupabase } from '@/utils/supabase'
+import { handlePasswordUpdate, checkAuth } from '@/utils/auth'
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const supabase = getSupabase()
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      const { isAuthenticated } = await checkAuth()
+      if (!isAuthenticated) {
         router.push('/login')
       }
     }
     checkSession()
-  }, [router, supabase])
+  }, [router])
 
-  const handleResetPassword = async (e) => {
+  const onResetPassword = async (e) => {
     e.preventDefault()
     
     if (password !== confirmPassword) {
@@ -29,80 +29,98 @@ export default function ResetPassword() {
       return
     }
 
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      })
-      
-      if (error) throw error
-      
-      setError(null)
+    setIsLoading(true)
+    setError(null)
+
+    const { success, error, message } = await handlePasswordUpdate(password)
+    
+    if (success) {
       setSuccess(true)
-      
-      // Redirect to login after 3 seconds
+      setError(null)
       setTimeout(() => {
         router.push('/login')
       }, 3000)
-    } catch (error) {
-      setError(error.message)
+    } else {
+      setError(error)
     }
+    
+    setIsLoading(false)
   }
 
   return (
     <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
-      <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md w-96">
-        <h1 className="text-2xl font-bold mb-6 text-[var(--color-fourth)]">Set New Password</h1>
-        
-        {success ? (
-          <div className="text-green-500 mb-4">
-            Password updated successfully! Redirecting to dashboard...
+      <div className="w-full max-w-sm space-y-8 p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-[var(--color-fourth)]">Set New Password</h1>
+          <p className="text-[var(--color-fourth)]/80 mt-2">
+            Please enter your new password below.
+          </p>
+        </div>
+
+        {success && (
+          <div className="bg-[var(--color-tertiary)] text-[var(--color-primary)] p-4 rounded-lg shadow-lg">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <p>Password updated successfully! Redirecting to login...</p>
+            </div>
           </div>
-        ) : (
-          <form onSubmit={handleResetPassword}>
-            <div className="mb-4">
-              <label htmlFor="password" className="block text-[var(--color-fourth)] mb-2">
+        )}
+
+        <form className="mt-8 space-y-6" onSubmit={onResetPassword}>
+          {error && (
+            <div className="text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="password" className="block text-[var(--color-fourth)] font-medium mb-2">
                 New Password
               </label>
               <input
-                type="password"
                 id="password"
+                name="password"
+                type="password"
+                required
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
+                placeholder="Enter new password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 bg-[var(--color-third)] text-[var(--color-fourth)]"
-                required
-                minLength={6}
+                disabled={isLoading}
               />
             </div>
 
-            <div className="mb-4">
-              <label htmlFor="confirmPassword" className="block text-[var(--color-fourth)] mb-2">
+            <div>
+              <label htmlFor="confirmPassword" className="block text-[var(--color-fourth)] font-medium mb-2">
                 Confirm New Password
               </label>
               <input
-                type="password"
                 id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                className="w-full px-3 py-2 bg-[var(--color-secondary)] border-0 rounded-md focus:ring-2 focus:ring-[var(--color-tertiary)]"
+                placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-2 rounded border border-gray-300 bg-[var(--color-third)] text-[var(--color-fourth)]"
-                required
-                minLength={6}
+                disabled={isLoading}
               />
             </div>
-            
-            {error && (
-              <div className="text-red-500 mb-4">
-                {error}
-              </div>
-            )}
-            
+          </div>
+
+          <div>
             <button
               type="submit"
-              className="w-full bg-[var(--color-fourth)] text-[var(--color-primary)] py-2 rounded hover:bg-opacity-90 transition-colors"
+              disabled={isLoading}
+              className="w-full py-2 px-4 bg-[var(--color-tertiary)] hover:bg-[var(--color-fourth)] rounded-md text-[var(--color-primary)] font-medium transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Update Password
+              {isLoading ? 'Updating...' : 'Update Password'}
             </button>
-          </form>
-        )}
+          </div>
+        </form>
       </div>
     </div>
   )

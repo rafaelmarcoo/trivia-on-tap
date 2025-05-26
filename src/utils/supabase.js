@@ -17,23 +17,47 @@ export const getSupabase = () => {
   return supabase
 }
 
-export const useAutoLogout = () => {
+export const useAutoLogout = (options = {}) => {
+  const {
+    enabled = true,
+    inactivityTimeout = 30 * 60 * 1000, // 30 minutes
+    onLogout = () => {}
+  } = options
+
   useEffect(() => {
-    const handleBeforeUnload = async () => {
-      try {
-        const supabase = getSupabase()
-        await supabase.auth.signOut()
-      } catch (error) {
-        console.error('Error during auto logout:', error)
-      }
+    if (!enabled) return
+
+    let inactivityTimer
+
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer)
+      inactivityTimer = setTimeout(async () => {
+        try {
+          const supabase = getSupabase()
+          await supabase.auth.signOut()
+          onLogout()
+        } catch (error) {
+          console.error('Error during auto logout:', error)
+        }
+      }, inactivityTimeout)
     }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
+    // Reset timer on user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer)
+    })
+
+    // Initial timer setup
+    resetTimer()
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+      if (inactivityTimer) clearTimeout(inactivityTimer)
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer)
+      })
     }
-  }, [])
+  }, [enabled, inactivityTimeout, onLogout])
 }
 
 export default getSupabase 
