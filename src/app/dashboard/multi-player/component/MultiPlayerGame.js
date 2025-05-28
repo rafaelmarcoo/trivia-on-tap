@@ -52,7 +52,7 @@ export default function MultiPlayerGame() {
     getCurrentUser();
   }, []);
 
-  // Subscribe to lobby and game changes
+  // Subscribe to lobby changes
   useEffect(() => {
     if (!lobbyId) return;
 
@@ -70,6 +70,42 @@ export default function MultiPlayerGame() {
           if (payload.eventType === "UPDATE") {
             const updatedLobby = payload.new;
             setLobbyData(updatedLobby);
+
+            // Start game immediately if lobby is in_progress and has game session
+            if (
+              updatedLobby.status === "in_progress" &&
+              updatedLobby.game_session_id
+            ) {
+              try {
+                setIsLoading(true);
+                const { data: dbQuestions, error: fetchError } = await supabase
+                  .from("session_questions")
+                  .select("*")
+                  .eq("game_session_id", updatedLobby.game_session_id)
+                  .order("question_order", { ascending: true });
+
+                if (fetchError) throw fetchError;
+
+                if (dbQuestions && dbQuestions.length > 0) {
+                  const formattedQuestions = dbQuestions.map((q) => ({
+                    id: q.id,
+                    question: q.question_text,
+                    type: q.question_type,
+                    options: q.options,
+                    correctAnswer: q.correct_answer,
+                  }));
+
+                  setQuestions(formattedQuestions);
+                  setGameSessionId(updatedLobby.game_session_id);
+                  setGameState("playing");
+                }
+              } catch (error) {
+                console.error("Error starting game:", error);
+                setError("Failed to start game");
+              } finally {
+                setIsLoading(false);
+              }
+            }
           }
         }
       )
@@ -77,8 +113,47 @@ export default function MultiPlayerGame() {
 
     setChannel(channel);
 
-    // Fetch initial lobby data
-    fetchLobbyData();
+    // Check initial lobby state
+    const checkInitialLobbyState = async () => {
+      try {
+        const { data: lobby, error } = await supabase
+          .from("game_lobbies")
+          .select("*")
+          .eq("id", lobbyId)
+          .single();
+
+        if (error) throw error;
+
+        if (lobby && lobby.status === "in_progress" && lobby.game_session_id) {
+          const { data: dbQuestions, error: fetchError } = await supabase
+            .from("session_questions")
+            .select("*")
+            .eq("game_session_id", lobby.game_session_id)
+            .order("question_order", { ascending: true });
+
+          if (fetchError) throw fetchError;
+
+          if (dbQuestions && dbQuestions.length > 0) {
+            const formattedQuestions = dbQuestions.map((q) => ({
+              id: q.id,
+              question: q.question_text,
+              type: q.question_type,
+              options: q.options,
+              correctAnswer: q.correct_answer,
+            }));
+
+            setQuestions(formattedQuestions);
+            setGameSessionId(lobby.game_session_id);
+            setGameState("playing");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking initial lobby state:", error);
+        setError("Failed to check game status");
+      }
+    };
+
+    checkInitialLobbyState();
 
     return () => {
       if (channel) {

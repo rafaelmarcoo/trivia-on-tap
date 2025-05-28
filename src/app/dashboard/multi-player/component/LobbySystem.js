@@ -108,20 +108,21 @@ export default function LobbySystem() {
             .delete()
             .in("user_id", [otherPlayer.user_id, user.id]);
 
-          // Create a new lobby
+          // Create a new lobby with in_progress status
           const { data: newLobby, error: createError } = await supabase
             .from("game_lobbies")
             .insert({
               host_id: otherPlayer.user_id,
-              status: "starting",
+              status: "in_progress",
               max_players: 2,
               current_players: 2,
             })
             .select()
             .single();
+
           if (createError) throw createError;
 
-          // Create a new game session (make sure to set game_type)
+          // Create a new game session
           const { data: newSession, error: sessionError } = await supabase
             .from("game_sessions")
             .insert({
@@ -130,17 +131,25 @@ export default function LobbySystem() {
             })
             .select()
             .single();
+
           if (sessionError) throw sessionError;
 
-          // Insert questions for this session (replace with your logic)
+          // Get random questions
           const { data: questions, error: questionsError } = await supabase
-            .from("questions_pool")
+            .from("game_questions")
             .select("*")
-            .order("RANDOM()")
-            .limit(10);
+            .limit(10)
+            .order("id", { ascending: false });
+
           if (questionsError) throw questionsError;
 
-          const formattedQuestions = questions.map((q, idx) => ({
+          // Shuffle the questions in JavaScript instead
+          const shuffledQuestions = questions
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 10);
+
+          // Format and insert questions
+          const formattedQuestions = shuffledQuestions.map((q, idx) => ({
             game_session_id: newSession.id,
             question_text: q.question_text,
             question_type: q.question_type,
@@ -149,16 +158,23 @@ export default function LobbySystem() {
             question_order: idx + 1,
           }));
 
+          // Insert questions for the game session
           const { error: insertQuestionsError } = await supabase
-            .from("game_questions")
+            .from("session_questions")
             .insert(formattedQuestions);
+
           if (insertQuestionsError) throw insertQuestionsError;
 
-          // Update lobby with the new game session id
-          await supabase
+          // Update lobby with game session and ensure it's in_progress
+          const { error: updateError } = await supabase
             .from("game_lobbies")
-            .update({ game_session_id: newSession.id })
+            .update({
+              game_session_id: newSession.id,
+              status: "in_progress",
+            })
             .eq("id", newLobby.id);
+
+          if (updateError) throw updateError;
 
           // Add both players to the lobby
           await supabase.from("game_lobby_players").insert([
@@ -166,9 +182,10 @@ export default function LobbySystem() {
             { lobby_id: newLobby.id, user_id: user.id },
           ]);
 
-          // Redirect to the lobby/game
-          if (isMounted)
+          // Redirect to the game immediately
+          if (isMounted) {
             router.push(`/dashboard/multi-player?lobby=${newLobby.id}`);
+          }
         }
       } catch (error) {
         setError(error.message || "Matchmaking failed");
