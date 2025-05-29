@@ -172,6 +172,13 @@ export default function Dashboard() {
             <span>Game History</span>
           </button>
           <button
+            onClick={() => router.push("/dashboard/friends")}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+          >
+            <span className="text-xl">👥</span>
+            <span>Friends</span>
+          </button>
+          <button
             onClick={() => router.push("/dashboard/tutorial")}
             className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
           >
