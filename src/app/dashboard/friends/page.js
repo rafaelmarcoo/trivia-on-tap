@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2 } from 'lucide-react'
 import { checkAuth } from "@/utils/auth"
 import { 
   getFriends, 
@@ -91,7 +92,7 @@ export default function FriendsPage() {
     }
   }
 
-  const searchForUsers = async () => {
+  const searchForUsers = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
@@ -106,7 +107,7 @@ export default function FriendsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [searchTerm])
 
   const handleSendFriendRequest = async (userId) => {
     try {
@@ -237,9 +238,11 @@ export default function FriendsPage() {
       <div className="flex items-center gap-3">
         <div className="h-12 w-12 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
           {user.profile_image || user.friend_profile_image ? (
-            <img 
+            <Image 
               src={user.profile_image || user.friend_profile_image} 
               alt="Profile" 
+              width={48}
+              height={48}
               className="h-full w-full object-cover"
               onError={(e) => e.target.style.display = 'none'}
             />
@@ -248,73 +251,88 @@ export default function FriendsPage() {
           )}
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-amber-900">
-            {user.username || user.friend_username}
+          <h3 className="font-medium text-gray-900">
+            {user.username || user.friend_username || 'Unknown User'}
           </h3>
           <p className="text-sm text-amber-600">
-            Level {user.user_level || user.friend_level}
+            Level {user.user_level || user.friend_level || 1}
           </p>
-          {(user.status || user.friend_status) && (
-            <p className="text-xs text-amber-500 italic">
-              {user.status || user.friend_status}
+          {actionType === 'accept' && (
+            <p className="text-xs text-gray-500 mt-1">
+              {new Date(user.created_at).toLocaleDateString()}
             </p>
           )}
         </div>
+
         {showActions && (
-          <div className="flex gap-2">
-            {actionType === 'add' && !user.is_friend && !user.has_pending_request && (
-              <button
-                onClick={() => handleSendFriendRequest(user.user_id)}
-                className="bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600 transition-colors duration-200 text-sm"
-              >
-                Add Friend
-              </button>
-            )}
-            {actionType === 'add' && user.has_pending_request && (
-              <span className="text-amber-600 text-sm px-3 py-1">Request Sent</span>
-            )}
-            {actionType === 'add' && user.is_friend && (
-              <span className="text-green-600 text-sm px-3 py-1">Friends</span>
-            )}
-            {actionType === 'accept' && (
+          <div className="flex items-center gap-2">
+            {actionType === 'add' && (
               <>
+                {user.is_friend ? (
+                  <span className="text-sm text-green-600 font-medium">Friends</span>
+                ) : user.has_pending_request ? (
+                  <span className="text-sm text-amber-600 font-medium">Pending</span>
+                ) : (
+                  <button
+                    onClick={() => handleSendFriendRequest(user.user_id)}
+                    className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors duration-200 flex items-center gap-2"
+                  >
+                    <UserPlus size={16} />
+                    Add Friend
+                  </button>
+                )}
+              </>
+            )}
+
+            {actionType === 'accept' && (
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleAcceptRequest(user.id)}
-                  className="bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors duration-200"
+                  className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors duration-200"
                 >
-                  <Check size={16} />
+                  Accept
                 </button>
                 <button
                   onClick={() => handleRejectRequest(user.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors duration-200"
+                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors duration-200"
                 >
-                  <X size={16} />
+                  Reject
                 </button>
-              </>
+              </div>
             )}
+
             {actionType === 'cancel' && (
               <button
                 onClick={() => handleCancelRequest(user.id)}
-                className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors duration-200"
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors duration-200"
               >
                 Cancel
               </button>
             )}
+
             {actionType === 'remove' && (
               <>
                 <button
                   onClick={() => handleChallengeFriend(user)}
-                  className="bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
+                  className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
+                  title="Challenge to game"
                 >
-                  <Trophy size={14} />
+                  <Gamepad2 size={16} />
                   Challenge
                 </button>
-                <button
-                  onClick={() => handleRemoveFriend(user.friend_id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition-colors duration-200"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="relative group">
+                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200">
+                    <MoreVertical size={16} />
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 min-w-[120px]">
+                    <button
+                      onClick={() => handleRemoveFriend(user.friend_id)}
+                      className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-600 transition-colors duration-200 text-sm"
+                    >
+                      Remove Friend
+                    </button>
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -378,8 +396,8 @@ export default function FriendsPage() {
                 ) : friends.length === 0 ? (
                   <div className="text-center py-8 text-amber-600">
                     <Users size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>You don't have any friends yet.</p>
-                    <p className="text-sm">Use the "Add Friends" tab to find and connect with other players!</p>
+                    <p>You don&apos;t have any friends yet.</p>
+                    <p className="text-sm">Use the &ldquo;Add Friends&rdquo; tab to find and connect with other players!</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -486,7 +504,7 @@ export default function FriendsPage() {
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="text-center py-8 text-amber-600">
-                    <p>No users found matching "{searchTerm}"</p>
+                    <p>No users found matching &ldquo;{searchTerm}&rdquo;</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
