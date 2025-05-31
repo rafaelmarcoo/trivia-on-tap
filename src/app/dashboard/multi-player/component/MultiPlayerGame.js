@@ -23,12 +23,13 @@ export default function MultiPlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lobbyId = searchParams.get("lobby");
+  const sessionId = searchParams.get("session");
   const userLevel = searchParams.get("level") || 1;
   const supabase = getSupabase();
 
   useAutoLogout();
 
-  const [gameState, setGameState] = useState(lobbyId ? "lobby" : "selection");
+  const [gameState, setGameState] = useState("selection");
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -36,10 +37,12 @@ export default function MultiPlayerGame() {
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
-  const [gameSessionId, setGameSessionId] = useState(null);
+  const [gameSessionId, setGameSessionId] = useState(sessionId);
   const [lobbyData, setLobbyData] = useState(null);
   const [channel, setChannel] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [preGeneratedQuestions, setPreGeneratedQuestions] = useState(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -79,7 +82,7 @@ export default function MultiPlayerGame() {
               try {
                 setIsLoading(true);
                 const { data: dbQuestions, error: fetchError } = await supabase
-                  .from("session_questions")
+                  .from("game_questions")
                   .select("*")
                   .eq("game_session_id", updatedLobby.game_session_id)
                   .order("question_order", { ascending: true });
@@ -116,24 +119,39 @@ export default function MultiPlayerGame() {
     // Check initial lobby state
     const checkInitialLobbyState = async () => {
       try {
+        console.log("Checking initial lobby state for lobby:", lobbyId);
         const { data: lobby, error } = await supabase
           .from("game_lobbies")
           .select("*")
           .eq("id", lobbyId)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching lobby:", error);
+          throw error;
+        }
+
+        console.log("Found lobby:", lobby);
+        setLobbyData(lobby);
 
         if (lobby && lobby.status === "in_progress" && lobby.game_session_id) {
+          console.log(
+            "Lobby is in progress, fetching questions for session:",
+            lobby.game_session_id
+          );
           const { data: dbQuestions, error: fetchError } = await supabase
-            .from("session_questions")
+            .from("game_questions")
             .select("*")
             .eq("game_session_id", lobby.game_session_id)
             .order("question_order", { ascending: true });
 
-          if (fetchError) throw fetchError;
+          if (fetchError) {
+            console.error("Error fetching questions:", fetchError);
+            throw fetchError;
+          }
 
           if (dbQuestions && dbQuestions.length > 0) {
+            console.log("Found questions:", dbQuestions.length);
             const formattedQuestions = dbQuestions.map((q) => ({
               id: q.id,
               question: q.question_text,
@@ -145,11 +163,16 @@ export default function MultiPlayerGame() {
             setQuestions(formattedQuestions);
             setGameSessionId(lobby.game_session_id);
             setGameState("playing");
+          } else {
+            console.log("No questions found for session");
           }
+        } else {
+          console.log("Lobby not in progress or no game session");
         }
       } catch (error) {
         console.error("Error checking initial lobby state:", error);
         setError("Failed to check game status");
+        // Don't rethrow the error, just log it and set the error state
       }
     };
 
@@ -206,11 +229,18 @@ export default function MultiPlayerGame() {
       if (sessionError) throw sessionError;
       setGameSessionId(sessionData.id);
 
-      // Generate questions
-      const generatedQuestions = await generateTriviaQuestions(
-        categories.map((category) => category.id),
-        userLevel
-      );
+      // Use pre-generated questions if available, otherwise generate new ones
+      const generatedQuestions =
+        preGeneratedQuestions ||
+        (await generateTriviaQuestions(
+          categories.map((category) => category.id),
+          userLevel
+        ));
+
+      // Clear pre-generated questions after using them
+      if (preGeneratedQuestions) {
+        setPreGeneratedQuestions(null);
+      }
 
       // Insert questions into database
       const { error: insertError } = await supabase
@@ -357,6 +387,23 @@ export default function MultiPlayerGame() {
         } = await supabase.auth.getUser();
         if (userError || !user) throw new Error("Not authenticated");
 
+        // Start generating questions in parallel if not already generated
+        if (!preGeneratedQuestions && !isGeneratingQuestions) {
+          setIsGeneratingQuestions(true);
+          generateTriviaQuestions(
+            categories.map((category) => category.id),
+            userLevel
+          )
+            .then((questions) => {
+              setPreGeneratedQuestions(questions);
+              setIsGeneratingQuestions(false);
+            })
+            .catch((error) => {
+              console.error("Error pre-generating questions:", error);
+              setIsGeneratingQuestions(false);
+            });
+        }
+
         // Try to find a lobby with 1 player and status 'waiting'
         const { data: lobbies, error: findError } = await supabase
           .from("game_lobbies")
@@ -459,118 +506,6 @@ export default function MultiPlayerGame() {
     return <LobbySystem />;
   }
 
-  if (gameState === "lobby") {
-    return (
-      <div className="min-h-screen bg-[var(--color-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
-              Game Lobby
-            </h1>
-            <button
-              onClick={async () => {
-                try {
-                  // Remove player from lobby
-                  const {
-                    data: { user },
-                  } = await supabase.auth.getUser();
-                  if (user) {
-                    await supabase
-                      .from("game_lobby_players")
-                      .delete()
-                      .eq("lobby_id", lobbyId)
-                      .eq("user_id", user.id);
-
-                    // Update player count
-                    await supabase
-                      .from("game_lobbies")
-                      .update({
-                        current_players: lobbyData.current_players - 1,
-                        status:
-                          lobbyData.current_players <= 1
-                            ? "completed"
-                            : "waiting",
-                      })
-                      .eq("id", lobbyId);
-                  }
-                  router.push("/dashboard/multi-player");
-                } catch (error) {
-                  console.error("Error leaving lobby:", error);
-                  setError("Failed to leave lobby");
-                }
-              }}
-              className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
-            >
-              Leave Lobby
-            </button>
-          </div>
-
-          {error && (
-            <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
-
-          {lobbyData && (
-            <div className="bg-[var(--color-secondary)] p-6 rounded-lg">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-white mb-4">
-                  Players in Lobby
-                </h2>
-                <div className="space-y-2">
-                  {lobbyData.current_players === 0 ? (
-                    <p className="text-gray-300">No players yet</p>
-                  ) : (
-                    <p className="text-white">
-                      Players: {lobbyData.current_players}/
-                      {lobbyData.max_players}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {currentUserId === lobbyData.host_id && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={async () => {
-                      try {
-                        setError(null);
-                        // Check if there are enough players
-                        if (lobbyData.current_players < 1) {
-                          throw new Error("Need at least 1 player to start");
-                        }
-
-                        // Update lobby status to starting
-                        const { error: updateError } = await supabase
-                          .from("game_lobbies")
-                          .update({ status: "starting" })
-                          .eq("id", lobbyId);
-
-                        if (updateError) throw updateError;
-
-                        // Initialize the game
-                        await initializeGame(lobbyData);
-                      } catch (error) {
-                        console.error("Error starting game:", error);
-                        setError(error.message || "Failed to start game");
-                      }
-                    }}
-                    disabled={lobbyData.current_players < 1}
-                    className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-                  >
-                    {lobbyData.current_players < 1
-                      ? "Waiting for Players..."
-                      : "Start Game"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   if (gameState === "playing") {
     return (
       <div className="min-h-screen bg-[var(--color-primary)] p-8">
@@ -585,15 +520,24 @@ export default function MultiPlayerGame() {
               Loading...
             </div>
           </div>
-        ) : (
+        ) : currentQuestion ? (
           <QuestionDisplay
-            question={currentQuestion}
-            timeLeft={timeLeft}
+            type={currentQuestion.type}
+            question={currentQuestion.question}
+            options={currentQuestion.options}
+            correctAnswer={currentQuestion.correctAnswer}
             onAnswer={handleAnswer}
+            onNextQuestion={handleNextQuestion}
             questionNumber={currentQuestionIndex + 1}
             totalQuestions={questions.length}
             score={score}
+            timeLeft={timeLeft}
+            isLastQuestion={currentQuestionIndex === questions.length - 1}
           />
+        ) : (
+          <div className="text-center text-[var(--color-fourth)] text-xl">
+            No questions available
+          </div>
         )}
       </div>
     );
@@ -608,5 +552,11 @@ export default function MultiPlayerGame() {
     );
   }
 
-  return null;
+  return (
+    <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+      <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+        Loading game...
+      </div>
+    </div>
+  );
 }

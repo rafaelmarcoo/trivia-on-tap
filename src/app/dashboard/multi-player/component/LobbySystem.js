@@ -1,8 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/utils/supabase";
+import { generateTriviaQuestions } from "@/utils/openai";
+
+// Available quiz categories
+const categories = [
+  { id: "general", name: "General" },
+  { id: "history", name: "History" },
+  { id: "technology", name: "Technology" },
+  { id: "geography", name: "Geography" },
+  { id: "science", name: "Science" },
+  { id: "math", name: "Math" },
+];
 
 export default function LobbySystem() {
   const [error, setError] = useState(null);
@@ -10,6 +21,10 @@ export default function LobbySystem() {
   const [waitingPlayers, setWaitingPlayers] = useState([]);
   const supabase = getSupabase();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userLevel = searchParams.get("level") || 1;
+  const [matchFound, setMatchFound] = useState(false);
+  const [matchData, setMatchData] = useState(null);
 
   // Subscribe to waiting_players table in realtime
   useEffect(() => {
@@ -64,10 +79,10 @@ export default function LobbySystem() {
           .single();
 
         if (!alreadyWaiting) {
-          // Add yourself to waiting_players
+          // Add yourself to waiting_players using upsert
           const { data: insertData, error: insertError } = await supabase
             .from("waiting_players")
-            .insert({ user_id: user.id })
+            .upsert({ user_id: user.id })
             .select()
             .single();
 
@@ -108,7 +123,42 @@ export default function LobbySystem() {
             .delete()
             .in("user_id", [otherPlayer.user_id, user.id]);
 
-          // Create a new lobby with in_progress status
+          // Create a new game session
+          const { data: newSession, error: sessionError } = await supabase
+            .from("game_sessions")
+            .insert({
+              game_type: "multiplayer",
+              total_questions: 10,
+              user_id: user.id,
+            })
+            .select()
+            .single();
+
+          if (sessionError) throw sessionError;
+
+          // Generate questions using OpenAI
+          const generatedQuestions = await generateTriviaQuestions(
+            categories.map((category) => category.id),
+            userLevel
+          );
+
+          // Insert questions into database
+          const { error: insertQuestionsError } = await supabase
+            .from("game_questions")
+            .insert(
+              generatedQuestions.map((q, index) => ({
+                game_session_id: newSession.id,
+                question_text: q.question,
+                question_type: q.type,
+                options: q.options,
+                correct_answer: q.correctAnswer,
+                question_order: index + 1,
+              }))
+            );
+
+          if (insertQuestionsError) throw insertQuestionsError;
+
+          // Create a new lobby with in_progress status and game session
           const { data: newLobby, error: createError } = await supabase
             .from("game_lobbies")
             .insert({
@@ -116,65 +166,12 @@ export default function LobbySystem() {
               status: "in_progress",
               max_players: 2,
               current_players: 2,
+              game_session_id: newSession.id,
             })
             .select()
             .single();
 
           if (createError) throw createError;
-
-          // Create a new game session
-          const { data: newSession, error: sessionError } = await supabase
-            .from("game_sessions")
-            .insert({
-              lobby_id: newLobby.id,
-              game_type: "multiplayer",
-            })
-            .select()
-            .single();
-
-          if (sessionError) throw sessionError;
-
-          // Get random questions
-          const { data: questions, error: questionsError } = await supabase
-            .from("game_questions")
-            .select("*")
-            .limit(10)
-            .order("id", { ascending: false });
-
-          if (questionsError) throw questionsError;
-
-          // Shuffle the questions in JavaScript instead
-          const shuffledQuestions = questions
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 10);
-
-          // Format and insert questions
-          const formattedQuestions = shuffledQuestions.map((q, idx) => ({
-            game_session_id: newSession.id,
-            question_text: q.question_text,
-            question_type: q.question_type,
-            options: q.options,
-            correct_answer: q.correct_answer,
-            question_order: idx + 1,
-          }));
-
-          // Insert questions for the game session
-          const { error: insertQuestionsError } = await supabase
-            .from("session_questions")
-            .insert(formattedQuestions);
-
-          if (insertQuestionsError) throw insertQuestionsError;
-
-          // Update lobby with game session and ensure it's in_progress
-          const { error: updateError } = await supabase
-            .from("game_lobbies")
-            .update({
-              game_session_id: newSession.id,
-              status: "in_progress",
-            })
-            .eq("id", newLobby.id);
-
-          if (updateError) throw updateError;
 
           // Add both players to the lobby
           await supabase.from("game_lobby_players").insert([
@@ -182,9 +179,13 @@ export default function LobbySystem() {
             { lobby_id: newLobby.id, user_id: user.id },
           ]);
 
-          // Redirect to the game immediately
           if (isMounted) {
-            router.push(`/dashboard/multi-player?lobby=${newLobby.id}`);
+            // Instead of redirecting, set match data and flag
+            setMatchData({
+              lobbyId: newLobby.id,
+              sessionId: newSession.id,
+            });
+            setMatchFound(true);
           }
         }
       } catch (error) {
@@ -203,6 +204,17 @@ export default function LobbySystem() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If match is found, update URL and let parent component handle the game
+  useEffect(() => {
+    if (matchFound && matchData) {
+      const url = `/dashboard/multi-player?lobby=${matchData.lobbyId}&session=${matchData.sessionId}`;
+      // Update URL without navigation
+      window.history.pushState({}, "", url);
+      // Force a re-render of the parent component
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [matchFound, matchData]);
 
   return (
     <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
