@@ -208,7 +208,7 @@ export default function Dashboard() {
               // Set URL hash to open messages tab
               setTimeout(() => {
                 const friendsPageState = { activeTab: 'messages' }
-                window.history.replaceState(friendsPageState, '', '/dashboard/friends#messages')
+                window.history.replaceState(friendsPageState, '', '/dashboard/friends/messages')
               }, 100)
             }}
             className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3 relative"
