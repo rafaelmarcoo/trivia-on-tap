@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS public.game_sessions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   ended_at TIMESTAMP WITH TIME ZONE,
   categories TEXT[] DEFAULT ARRAY[]::TEXT[],
-  difficulty_level INTEGER DEFAULT 1
+  difficulty_level INTEGER DEFAULT 1,
+  current_question_index INTEGER DEFAULT 0,
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- Create game_questions table
@@ -45,6 +47,8 @@ CREATE TABLE IF NOT EXISTS public.game_lobby_players (
   lobby_id UUID REFERENCES public.game_lobbies(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  score INTEGER DEFAULT 0,
+  last_answer_at TIMESTAMP WITH TIME ZONE,
   UNIQUE(lobby_id, user_id)
 );
 

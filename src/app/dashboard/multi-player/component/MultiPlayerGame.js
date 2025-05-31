@@ -43,6 +43,7 @@ export default function MultiPlayerGame() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [preGeneratedQuestions, setPreGeneratedQuestions] = useState(null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [gameChannel, setGameChannel] = useState(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -309,8 +310,19 @@ export default function MultiPlayerGame() {
           user_answer: userAnswer,
           is_correct: isCorrect,
           time_taken: 30 - timeLeft,
+          answered_at: new Date().toISOString(),
         })
         .eq("id", currentQuestion.id);
+
+      // Update player's score in game_lobby_players
+      await supabase
+        .from("game_lobby_players")
+        .update({
+          score: score + (isCorrect ? 1 : 0),
+          last_answer_at: new Date().toISOString(),
+        })
+        .eq("lobby_id", lobbyId)
+        .eq("user_id", currentUserId);
 
       handleNextQuestion();
     } catch (error) {
@@ -319,14 +331,32 @@ export default function MultiPlayerGame() {
     }
   };
 
-  const handleNextQuestion = useCallback(() => {
+  const handleNextQuestion = useCallback(async () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setTimeLeft(30);
+      const nextIndex = currentQuestionIndex + 1;
+
+      try {
+        // Update the game session with the new question index
+        const { error: updateError } = await supabase
+          .from("game_sessions")
+          .update({
+            current_question_index: nextIndex,
+            last_updated: new Date().toISOString(),
+          })
+          .eq("id", gameSessionId);
+
+        if (updateError) throw updateError;
+
+        setCurrentQuestionIndex(nextIndex);
+        setTimeLeft(30);
+      } catch (error) {
+        console.error("Error updating question index:", error);
+        setError("Failed to sync game state: " + error.message);
+      }
     } else {
       endGame();
     }
-  }, [currentQuestionIndex, questions.length]);
+  }, [currentQuestionIndex, questions.length, gameSessionId]);
 
   const endGame = async () => {
     try {
@@ -360,16 +390,111 @@ export default function MultiPlayerGame() {
     }
   };
 
-  // Timer effect
+  // Subscribe to game state changes
+  useEffect(() => {
+    if (!gameSessionId) return;
+
+    const channel = supabase
+      .channel(`game_session:${gameSessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_sessions",
+          filter: `id=eq.${gameSessionId}`,
+        },
+        async (payload) => {
+          if (payload.new && payload.new.current_question_index !== undefined) {
+            setCurrentQuestionIndex(payload.new.current_question_index);
+          }
+        }
+      )
+      .subscribe();
+
+    setGameChannel(channel);
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [gameSessionId]);
+
+  // Add effect to sync with current question index and questions from database
+  useEffect(() => {
+    if (!gameSessionId) return;
+
+    const syncGameState = async () => {
+      try {
+        console.log("Syncing game state for session:", gameSessionId);
+
+        // Get session data including current question index
+        const { data: session, error: sessionError } = await supabase
+          .from("game_sessions")
+          .select("current_question_index")
+          .eq("id", gameSessionId)
+          .single();
+
+        if (sessionError) throw sessionError;
+
+        // Get all questions for this session
+        const { data: dbQuestions, error: questionsError } = await supabase
+          .from("game_questions")
+          .select("*")
+          .eq("game_session_id", gameSessionId)
+          .order("question_order", { ascending: true });
+
+        if (questionsError) throw questionsError;
+
+        if (!dbQuestions || dbQuestions.length === 0) {
+          throw new Error("No questions found for game session");
+        }
+
+        console.log("Found questions:", dbQuestions.length);
+
+        // Format questions consistently
+        const formattedQuestions = dbQuestions.map((q) => ({
+          id: q.id,
+          question: q.question_text,
+          type: q.question_type,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+        }));
+
+        // Update local state
+        setQuestions(formattedQuestions);
+        if (session?.current_question_index !== undefined) {
+          setCurrentQuestionIndex(session.current_question_index);
+        }
+      } catch (error) {
+        console.error("Error syncing game state:", error);
+        setError("Failed to sync game state: " + error.message);
+      }
+    };
+
+    syncGameState();
+  }, [gameSessionId]);
+
+  // Modify timer effect to be more precise
   useEffect(() => {
     let timer;
     if (gameState === "playing" && timeLeft > 0 && !isLoading) {
+      const startTime = Date.now();
+      const initialTimeLeft = timeLeft;
+
       timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      handleNextQuestion();
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const newTimeLeft = Math.max(0, initialTimeLeft - elapsed);
+
+        setTimeLeft(newTimeLeft);
+
+        if (newTimeLeft === 0) {
+          handleNextQuestion();
+        }
+      }, 100); // Update more frequently for smoother countdown
     }
+
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
 
@@ -387,23 +512,6 @@ export default function MultiPlayerGame() {
         } = await supabase.auth.getUser();
         if (userError || !user) throw new Error("Not authenticated");
 
-        // Start generating questions in parallel if not already generated
-        if (!preGeneratedQuestions && !isGeneratingQuestions) {
-          setIsGeneratingQuestions(true);
-          generateTriviaQuestions(
-            categories.map((category) => category.id),
-            userLevel
-          )
-            .then((questions) => {
-              setPreGeneratedQuestions(questions);
-              setIsGeneratingQuestions(false);
-            })
-            .catch((error) => {
-              console.error("Error pre-generating questions:", error);
-              setIsGeneratingQuestions(false);
-            });
-        }
-
         // Try to find a lobby with 1 player and status 'waiting'
         const { data: lobbies, error: findError } = await supabase
           .from("game_lobbies")
@@ -412,22 +520,23 @@ export default function MultiPlayerGame() {
           .eq("current_players", 1)
           .limit(1);
 
-        let lobby;
         if (findError) throw findError;
 
         if (lobbies && lobbies.length > 0) {
           // Join the existing lobby
-          lobby = lobbies[0];
+          const existingLobby = lobbies[0];
           await supabase.from("game_lobby_players").insert({
-            lobby_id: lobby.id,
+            lobby_id: existingLobby.id,
             user_id: user.id,
           });
           // Update lobby to 2 players and set status to 'starting'
           await supabase
             .from("game_lobbies")
             .update({ current_players: 2, status: "starting" })
-            .eq("id", lobby.id);
-          setLobbyId(lobby.id);
+            .eq("id", existingLobby.id);
+
+          // Update URL with lobby ID
+          router.push(`/dashboard/multi-player?lobby=${existingLobby.id}`);
         } else {
           // Create a new lobby
           const { data: newLobby, error: createError } = await supabase
@@ -446,7 +555,9 @@ export default function MultiPlayerGame() {
             lobby_id: newLobby.id,
             user_id: user.id,
           });
-          setLobbyId(newLobby.id);
+
+          // Update URL with lobby ID
+          router.push(`/dashboard/multi-player?lobby=${newLobby.id}`);
         }
       } catch (error) {
         setError(error.message || "Matchmaking failed");
