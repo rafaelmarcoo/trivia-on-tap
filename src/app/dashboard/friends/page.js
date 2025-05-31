@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2, MessageCircle } from 'lucide-react'
 import { checkAuth } from "@/utils/auth"
 import { 
   getFriends, 
@@ -15,7 +15,9 @@ import {
   cancelFriendRequest,
   removeFriend
 } from '@/utils/friends'
+import { getUnreadMessageCount } from '@/utils/messages'
 import FriendChallengeModal from './components/FriendChallengeModal'
+import { ConversationsList, ChatWindow } from './components/MessagingComponents'
 
 export default function FriendsPage() {
   const [activeTab, setActiveTab] = useState('friends')
@@ -27,6 +29,12 @@ export default function FriendsPage() {
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [challengeModal, setChallengeModal] = useState({ isOpen: false, friend: null })
+  
+  // Messaging state
+  const [selectedConversation, setSelectedConversation] = useState(null)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+  const [showMobileChat, setShowMobileChat] = useState(false)
+  
   const router = useRouter()
 
   // Check authentication on mount
@@ -38,7 +46,17 @@ export default function FriendsPage() {
       }
     }
     checkUserAuth()
+    
+    // Check URL hash to open specific tab
+    if (window.location.hash === '#messages') {
+      setActiveTab('messages')
+    }
   }, [router])
+
+  // Load unread message count
+  useEffect(() => {
+    loadUnreadMessageCount()
+  }, [])
 
   // Load data based on active tab
   useEffect(() => {
@@ -57,6 +75,17 @@ export default function FriendsPage() {
       setSearchResults([])
     }
   }, [searchTerm, activeTab])
+
+  const loadUnreadMessageCount = async () => {
+    try {
+      const result = await getUnreadMessageCount()
+      if (result.success) {
+        setUnreadMessageCount(result.data.count)
+      }
+    } catch (err) {
+      console.error('Failed to load unread message count:', err)
+    }
+  }
 
   const loadFriends = async () => {
     setIsLoading(true)
@@ -214,6 +243,36 @@ export default function FriendsPage() {
     // router.push(`/dashboard/multi-player?lobby=${lobbyData.id}`)
   }
 
+  // Messaging handlers
+  const handleSelectConversation = (conversation) => {
+    setSelectedConversation(conversation)
+    setShowMobileChat(true)
+  }
+
+  const handleBackToConversations = () => {
+    setSelectedConversation(null)
+    setShowMobileChat(false)
+  }
+
+  const handleConversationUpdate = () => {
+    // Reload unread count when conversations are updated
+    loadUnreadMessageCount()
+  }
+
+  // Add message button to friend actions
+  const handleMessageFriend = (friend) => {
+    const conversation = {
+      other_user_id: friend.friend_id,
+      other_user_name: friend.friend_username,
+      other_user_level: friend.friend_level,
+      other_user_profile_image: friend.friend_profile_image,
+      unread_count: 0
+    }
+    setActiveTab('messages')
+    setSelectedConversation(conversation)
+    setShowMobileChat(true)
+  }
+
   const TabButton = ({ tab, icon: Icon, label, count = null }) => (
     <button
       onClick={() => setActiveTab(tab)}
@@ -313,6 +372,14 @@ export default function FriendsPage() {
             {actionType === 'remove' && (
               <>
                 <button
+                  onClick={() => handleMessageFriend(user)}
+                  className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
+                  title="Send message"
+                >
+                  <MessageCircle size={16} />
+                  Message
+                </button>
+                <button
                   onClick={() => handleChallengeFriend(user)}
                   className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
                   title="Challenge to game"
@@ -378,14 +445,45 @@ export default function FriendsPage() {
               label="Requests" 
               count={friendRequests.received.length}
             />
+            <TabButton 
+              tab="messages" 
+              icon={MessageCircle} 
+              label="Messages" 
+              count={unreadMessageCount}
+            />
             <TabButton tab="add" icon={UserPlus} label="Add Friends" />
           </div>
 
           {/* Tab Content */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Messages Tab */}
+            {activeTab === 'messages' && (
+              <div className="h-[600px] flex">
+                {/* Conversations List - Desktop: Always visible, Mobile: Hidden when chat is open */}
+                <div className={`w-full lg:w-1/3 border-r border-amber-200 ${showMobileChat ? 'hidden lg:block' : 'block'}`}>
+                  <div className="p-4 border-b border-amber-200 bg-amber-50">
+                    <h2 className="text-xl font-semibold text-amber-900">Messages</h2>
+                  </div>
+                  <ConversationsList 
+                    onSelectConversation={handleSelectConversation}
+                    selectedConversationId={selectedConversation?.other_user_id}
+                  />
+                </div>
+
+                {/* Chat Window - Desktop: Always visible, Mobile: Only when conversation selected */}
+                <div className={`w-full lg:w-2/3 ${showMobileChat || selectedConversation ? 'block' : 'hidden lg:block'}`}>
+                  <ChatWindow 
+                    conversation={selectedConversation}
+                    onBack={handleBackToConversations}
+                    onConversationUpdate={handleConversationUpdate}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Friends Tab */}
             {activeTab === 'friends' && (
-              <div>
+              <div className="p-6">
                 <h2 className="text-xl font-semibold text-amber-900 mb-4">
                   Your Friends ({friends.length})
                 </h2>
@@ -415,7 +513,7 @@ export default function FriendsPage() {
 
             {/* Friend Requests Tab */}
             {activeTab === 'requests' && (
-              <div className="space-y-6">
+              <div className="p-6 space-y-6">
                 {/* Received Requests */}
                 <div>
                   <h2 className="text-xl font-semibold text-amber-900 mb-4">
@@ -474,7 +572,7 @@ export default function FriendsPage() {
 
             {/* Add Friends Tab */}
             {activeTab === 'add' && (
-              <div>
+              <div className="p-6">
                 <h2 className="text-xl font-semibold text-amber-900 mb-4">
                   Find Friends
                 </h2>
