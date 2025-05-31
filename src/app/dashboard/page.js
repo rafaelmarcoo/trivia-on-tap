@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabase, useAutoLogout } from "@/utils/supabase"
 import { handleLogout, checkAuth } from "@/utils/auth"
+import { getUnreadMessageCount } from "@/utils/messages"
 import { User } from "lucide-react"
 
 export default function Dashboard() {
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [profileImage, setProfileImage] = useState(null)
   const [status, setStatus] = useState("")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const router = useRouter()
   const supabase = getSupabase()
 
@@ -44,6 +46,20 @@ export default function Dashboard() {
     loadProfileImage()
   }, [supabase])
 
+  const loadUnreadMessageCount = useCallback(async () => {
+    try {
+      const { isAuthenticated } = await checkAuth()
+      if (isAuthenticated) {
+        const result = await getUnreadMessageCount()
+        if (result.success) {
+          setUnreadMessageCount(result.data.count)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load unread message count:', err)
+    }
+  }, [])
+
   const getUser = useCallback(async () => {
     try {
       const { isAuthenticated, session } = await checkAuth()
@@ -68,10 +84,13 @@ export default function Dashboard() {
         setUserLevel(userData.user_level || 1)
         setStatus(userData.status || "Feeling smart!")
       }
+
+      // Load unread message count after user is loaded
+      loadUnreadMessageCount()
     } catch (error) {
       console.error("Error fetching user data:", error)
     }
-  }, [router, supabase])
+  }, [router, supabase, loadUnreadMessageCount])
 
   useEffect(() => {
     getUser()
@@ -173,10 +192,34 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => router.push("/dashboard/friends")}
-            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3 relative"
           >
             <span className="text-xl">👥</span>
             <span>Friends</span>
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {unreadMessageCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              router.push("/dashboard/friends")
+              // Set URL hash to open messages tab
+              setTimeout(() => {
+                const friendsPageState = { activeTab: 'messages' }
+                window.history.replaceState(friendsPageState, '', '/dashboard/friends#messages')
+              }, 100)
+            }}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3 relative"
+          >
+            <span className="text-xl">💬</span>
+            <span>Messages</span>
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {unreadMessageCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => router.push("/dashboard/tutorial")}
