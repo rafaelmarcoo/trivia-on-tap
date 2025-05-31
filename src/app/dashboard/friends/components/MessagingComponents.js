@@ -18,6 +18,7 @@ import {
   markMessagesAsRead,
   deleteMessage
 } from '@/utils/messages'
+import { getSupabase } from '@/utils/supabase'
 import { formatDistanceToNow } from 'date-fns'
 
 // Main Conversations List Component
@@ -25,10 +26,84 @@ export const ConversationsList = ({ onSelectConversation, selectedConversationId
   const [conversations, setConversations] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(null)
+  const refreshTimeoutRef = useRef(null)
 
   useEffect(() => {
-    loadConversations()
+    // Get current user ID first
+    const getCurrentUser = async () => {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUserId(user.id)
+      }
+    }
+    getCurrentUser()
   }, [])
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadConversations()
+      
+      // Set up real-time subscription for conversations
+      const supabase = getSupabase()
+      
+      const conversationsChannel = supabase
+        .channel('conversations_changes')
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'conversations' 
+          }, 
+          (payload) => {
+            // Only update if this conversation involves the current user
+            const updatedConversation = payload.new
+            if (updatedConversation.user1_id === currentUserId || updatedConversation.user2_id === currentUserId) {
+              debouncedSilentRefresh()
+            }
+          }
+        )
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages'
+          }, 
+          (payload) => {
+            // Only update if this message involves the current user
+            const newMessage = payload.new
+            if (newMessage.sender_id === currentUserId || newMessage.receiver_id === currentUserId) {
+              debouncedSilentRefresh()
+            }
+          }
+        )
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'messages'
+          }, 
+          (payload) => {
+            // Update when read status changes for better responsiveness
+            const updatedMessage = payload.new
+            if ((updatedMessage.sender_id === currentUserId || updatedMessage.receiver_id === currentUserId) &&
+                payload.old.is_read !== updatedMessage.is_read) {
+              debouncedSilentRefresh()
+            }
+          }
+        )
+        .subscribe()
+
+      // Cleanup subscription on unmount
+      return () => {
+        supabase.removeChannel(conversationsChannel)
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current)
+        }
+      }
+    }
+  }, [currentUserId])
 
   const loadConversations = async () => {
     setIsLoading(true)
@@ -44,6 +119,26 @@ export const ConversationsList = ({ onSelectConversation, selectedConversationId
       setError('Failed to load conversations')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Debounced silent refresh to prevent rapid successive updates
+  const debouncedSilentRefresh = () => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+    refreshTimeoutRef.current = setTimeout(silentRefreshConversations, 150)
+  }
+
+  // Silent refresh for real-time updates (no loading state)
+  const silentRefreshConversations = async () => {
+    try {
+      const result = await getConversations()
+      if (result.success) {
+        setConversations(result.data)
+      }
+    } catch (err) {
+      console.error('Silent refresh failed:', err)
     }
   }
 
@@ -286,14 +381,120 @@ export const ChatWindow = ({ conversation, onBack, onConversationUpdate }) => {
   const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(null)
   const messagesEndRef = useRef(null)
 
   useEffect(() => {
-    if (conversation) {
-      loadMessages()
-      markAsRead()
+    // Get current user ID
+    const getCurrentUser = async () => {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUserId(user.id)
+      }
     }
-  }, [conversation])
+    getCurrentUser()
+  }, [])
+
+  useEffect(() => {
+    if (conversation && currentUserId) {
+      loadMessages()
+      // Mark messages as read immediately when opening conversation
+      setTimeout(() => markAsRead(), 200)
+      
+      // Set up real-time subscription for messages in this conversation
+      const supabase = getSupabase()
+      
+      const messagesChannel = supabase
+        .channel(`messages_${conversation.other_user_id}`)
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'messages'
+          }, 
+          (payload) => {
+            // Add new message to the list if it's for this conversation
+            const newMessage = payload.new
+            if ((newMessage.sender_id === conversation.other_user_id && newMessage.receiver_id === currentUserId) || 
+                (newMessage.sender_id === currentUserId && newMessage.receiver_id === conversation.other_user_id)) {
+              
+              // Transform the message to match our component format
+              const formattedMessage = {
+                message_id: newMessage.id,
+                sender_id: newMessage.sender_id,
+                receiver_id: newMessage.receiver_id,
+                content: newMessage.content,
+                created_at: newMessage.created_at,
+                is_read: newMessage.is_read,
+                sender_name: newMessage.sender_id === conversation.other_user_id ? conversation.other_user_name : 'You',
+                sender_profile_image: newMessage.sender_id === conversation.other_user_id ? conversation.other_user_profile_image : '',
+                is_from_current_user: newMessage.sender_id === currentUserId
+              }
+              
+              setMessages(prev => [...prev, formattedMessage])
+              
+              // Mark as read immediately if we received a message and we're viewing this conversation
+              if (newMessage.sender_id === conversation.other_user_id) {
+                // Mark as read immediately since user is viewing the conversation
+                setTimeout(() => markAsRead(), 100)
+              }
+            }
+          }
+        )
+        .on('postgres_changes', 
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'messages'
+          }, 
+          (payload) => {
+            // Update message status (like read status)
+            const updatedMessage = payload.new
+            setMessages(prev => prev.map(msg => 
+              msg.message_id === updatedMessage.id 
+                ? { ...msg, is_read: updatedMessage.is_read }
+                : msg
+            ))
+            
+            // Trigger conversation update when read status changes
+            if (payload.old.is_read !== updatedMessage.is_read) {
+              onConversationUpdate?.()
+            }
+          }
+        )
+        .on('postgres_changes', 
+          { 
+            event: 'DELETE', 
+            schema: 'public', 
+            table: 'messages'
+          }, 
+          (payload) => {
+            // Remove deleted messages
+            const deletedMessage = payload.old
+            setMessages(prev => prev.filter(msg => msg.message_id !== deletedMessage.id))
+          }
+        )
+        .subscribe()
+
+      // Cleanup subscription when conversation changes or component unmounts
+      return () => {
+        supabase.removeChannel(messagesChannel)
+      }
+    }
+  }, [conversation, onConversationUpdate, currentUserId])
+
+  // Also mark as read when messages change (when new messages are loaded)
+  useEffect(() => {
+    if (messages.length > 0 && conversation) {
+      const hasUnreadFromOther = messages.some(msg => 
+        !msg.is_read && msg.sender_id === conversation.other_user_id
+      )
+      if (hasUnreadFromOther) {
+        setTimeout(() => markAsRead(), 300)
+      }
+    }
+  }, [messages, conversation])
 
   useEffect(() => {
     scrollToBottom()
@@ -338,17 +539,8 @@ export const ChatWindow = ({ conversation, onBack, onConversationUpdate }) => {
     try {
       const result = await sendMessage(conversation.other_user_id, content)
       if (result.success) {
-        // Add new message to the list
-        const newMessage = {
-          ...result.data,
-          message_id: result.data.id,
-          is_from_current_user: true,
-          sender_name: 'You',
-          sender_profile_image: '',
-          created_at: new Date().toISOString()
-        }
-        setMessages(prev => [...prev, newMessage])
-        onConversationUpdate?.()
+        // The real-time subscription will handle adding the message to the UI
+        // and updating the conversations list - no manual updates needed
       } else {
         setError(result.error)
         setTimeout(() => setError(null), 3000)
@@ -363,7 +555,8 @@ export const ChatWindow = ({ conversation, onBack, onConversationUpdate }) => {
     try {
       const result = await deleteMessage(messageId)
       if (result.success) {
-        setMessages(prev => prev.filter(msg => msg.message_id !== messageId))
+        // The real-time subscription will handle removing the message from the UI
+        // We don't need to manually remove it here anymore
       } else {
         setError(result.error)
         setTimeout(() => setError(null), 3000)
@@ -410,9 +603,15 @@ export const ChatWindow = ({ conversation, onBack, onConversationUpdate }) => {
           )}
         </div>
         
-        <div>
+        <div className="flex-1">
           <h3 className="font-medium text-gray-900">{conversation.other_user_name}</h3>
           <p className="text-sm text-amber-600">Level {conversation.other_user_level}</p>
+        </div>
+        
+        {/* Connection Status Indicator */}
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-gray-500">Live</span>
         </div>
       </div>
 
