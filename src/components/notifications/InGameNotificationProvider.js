@@ -14,11 +14,12 @@ export const useNotifications = () => {
   return context
 }
 
+// Global notification provider - shows notifications everywhere in the app
 export default function InGameNotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [currentUserId, setCurrentUserId] = useState(null)
-  const [isGameActive, setIsGameActive] = useState(false)
+  const [isGameActive, setIsGameActive] = useState(false) // Kept for backward compatibility
 
   // Get current user ID on mount
   useEffect(() => {
@@ -44,14 +45,14 @@ export default function InGameNotificationProvider({ children }) {
     }
   }, [])
 
-  // Set up real-time subscriptions for notifications
+  // Set up real-time subscriptions for global notifications
   useEffect(() => {
     if (!currentUserId) return
 
     const supabase = getSupabase()
     loadUnreadCount()
 
-    // Subscribe to new messages
+    // Subscribe to new messages - now shows everywhere
     const messagesChannel = supabase
       .channel('new_messages_notifications')
       .on('postgres_changes', 
@@ -64,32 +65,30 @@ export default function InGameNotificationProvider({ children }) {
         async (payload) => {
           const newMessage = payload.new
           
-          // Only show notification during games or if specified
-          if (isGameActive) {
-            // Get sender info
-            const { data: senderData } = await supabase
-              .from('user')
-              .select('user_name, profile_image')
-              .eq('auth_id', newMessage.sender_id)
-              .single()
+          // Show notification everywhere in the app
+          // Get sender info
+          const { data: senderData } = await supabase
+            .from('user')
+            .select('user_name, profile_image')
+            .eq('auth_id', newMessage.sender_id)
+            .single()
 
-            const notification = {
-              id: `message_${newMessage.id}`,
-              type: 'message',
-              title: 'New Message',
-              message: `${senderData?.user_name || 'Someone'} sent you a message`,
-              data: {
-                messageId: newMessage.id,
-                senderId: newMessage.sender_id,
-                senderName: senderData?.user_name,
-                content: newMessage.content
-              },
-              timestamp: new Date(newMessage.created_at),
-              onClick: () => navigateToMessages(newMessage.sender_id)
-            }
-
-            addNotification(notification)
+          const notification = {
+            id: `message_${newMessage.id}`,
+            type: 'message',
+            title: 'New Message',
+            message: `${senderData?.user_name || 'Someone'} sent you a message`,
+            data: {
+              messageId: newMessage.id,
+              senderId: newMessage.sender_id,
+              senderName: senderData?.user_name,
+              content: newMessage.content
+            },
+            timestamp: new Date(newMessage.created_at),
+            onClick: () => navigateToMessages(newMessage.sender_id)
           }
+
+          addNotification(notification)
 
           // Update unread count
           loadUnreadCount()
@@ -97,7 +96,7 @@ export default function InGameNotificationProvider({ children }) {
       )
       .subscribe()
 
-    // Subscribe to friend requests
+    // Subscribe to friend requests - shows everywhere
     const friendRequestsChannel = supabase
       .channel('friend_requests_notifications')
       .on('postgres_changes', 
@@ -140,7 +139,7 @@ export default function InGameNotificationProvider({ children }) {
       supabase.removeChannel(messagesChannel)
       supabase.removeChannel(friendRequestsChannel)
     }
-  }, [currentUserId, isGameActive, loadUnreadCount])
+  }, [currentUserId, loadUnreadCount])
 
   // Add a new notification
   const addNotification = useCallback((notification) => {
@@ -171,7 +170,7 @@ export default function InGameNotificationProvider({ children }) {
     }
   }, [])
 
-  // Mark game as active/inactive
+  // Mark game as active/inactive (kept for backward compatibility)
   const setGameActive = useCallback((active) => {
     setIsGameActive(active)
   }, [])
