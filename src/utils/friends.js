@@ -13,48 +13,40 @@ export const sendFriendRequest = async (receiverId) => {
     if (userError) throw userError
     if (!user) throw new Error('User not authenticated')
     
-    // Check if request already exists (simplified query)
+    // Check if already friends using correct ordering
+    const user1_id = user.id < receiverId ? user.id : receiverId
+    const user2_id = user.id < receiverId ? receiverId : user.id
+    
+    const { data: friendship } = await supabase
+      .from('friendships')
+      .select('id')
+      .eq('user1_id', user1_id)
+      .eq('user2_id', user2_id)
+      .single()
+    
+    if (friendship) {
+      throw new Error('You are already friends with this user')
+    }
+    
+    // Check for pending friend requests (both directions)
     const { data: existingRequest1 } = await supabase
       .from('friend_requests')
-      .select('id, status')
+      .select('id')
       .eq('sender_id', user.id)
       .eq('receiver_id', receiverId)
+      .eq('status', 'pending')
       .single()
     
     const { data: existingRequest2 } = await supabase
       .from('friend_requests')
-      .select('id, status')
+      .select('id')
       .eq('sender_id', receiverId)
       .eq('receiver_id', user.id)
+      .eq('status', 'pending')
       .single()
     
-    const existingRequest = existingRequest1 || existingRequest2
-    
-    if (existingRequest) {
-      if (existingRequest.status === 'pending') {
-        throw new Error('Friend request already pending')
-      } else if (existingRequest.status === 'accepted') {
-        throw new Error('You are already friends with this user')
-      }
-    }
-    
-    // Check if already friends (simplified query)
-    const { data: friendship1 } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('user1_id', user.id)
-      .eq('user2_id', receiverId)
-      .single()
-    
-    const { data: friendship2 } = await supabase
-      .from('friendships')
-      .select('id')
-      .eq('user1_id', receiverId)
-      .eq('user2_id', user.id)
-      .single()
-    
-    if (friendship1 || friendship2) {
-      throw new Error('You are already friends with this user')
+    if (existingRequest1 || existingRequest2) {
+      throw new Error('Friend request already pending')
     }
     
     // Send friend request
@@ -89,8 +81,8 @@ export const acceptFriendRequest = async (requestId) => {
     if (userError) throw userError
     if (!user) throw new Error('User not authenticated')
     
-    // Update request status to accepted
-    const { data, error } = await supabase
+    // Step 1: Update request status to 'accepted' (this triggers the database function to create friendship)
+    const { data: updatedRequest, error: updateError } = await supabase
       .from('friend_requests')
       .update({ 
         status: 'accepted',
@@ -98,13 +90,49 @@ export const acceptFriendRequest = async (requestId) => {
       })
       .eq('id', requestId)
       .eq('receiver_id', user.id) // Ensure user can only accept requests sent to them
+      .eq('status', 'pending')
       .select()
       .single()
     
-    if (error) throw error
-    if (!data) throw new Error('Friend request not found or unauthorized')
+    if (updateError) throw updateError
+    if (!updatedRequest) throw new Error('Friend request not found or unauthorized')
     
-    return { success: true, data }
+    // Step 2: Clean up the friend request using database function (bypasses RLS)
+    try {
+      const { data: cleanupResult, error: cleanupError } = await supabase
+        .rpc('cleanup_accepted_friend_request', { request_uuid: requestId })
+      
+      console.log('Cleanup result:', { cleanupResult, cleanupError })
+      
+      if (cleanupError) {
+        console.warn('Database function cleanup failed:', cleanupError)
+      } else if (!cleanupResult) {
+        console.warn('No friend request was cleaned up by database function')
+      } else {
+        console.log('Successfully cleaned up friend request via database function')
+      }
+    } catch (cleanupFunctionError) {
+      console.log('Database function not available, falling back to direct delete')
+      
+      // Fallback to direct delete (may fail due to RLS)
+      const { data: deletedData, error: deleteError } = await supabase
+        .from('friend_requests')
+        .delete()
+        .eq('id', requestId)
+        .select()
+      
+      console.log('Direct delete result:', { deletedData, deleteError })
+      
+      if (deleteError) {
+        console.warn('Failed to clean up friend request after acceptance:', deleteError)
+      } else if (!deletedData || deletedData.length === 0) {
+        console.warn('No friend request was deleted - likely due to RLS policy restrictions')
+      } else {
+        console.log('Successfully cleaned up friend request via direct delete:', deletedData[0])
+      }
+    }
+    
+    return { success: true, data: { accepted: updatedRequest } }
   } catch (error) {
     console.error('Error accepting friend request:', error)
     return { success: false, error: error.message }
@@ -191,30 +219,26 @@ export const removeFriend = async (friendId) => {
     if (userError) throw userError
     if (!user) throw new Error('User not authenticated')
     
-    // Try deleting friendship in both directions
-    const { data: data1, error: error1 } = await supabase
+    // Respect the database constraint: user1_id < user2_id
+    // Determine the correct ordering for the friendship record
+    const user1_id = user.id < friendId ? user.id : friendId
+    const user2_id = user.id < friendId ? friendId : user.id
+    
+    // Delete the friendship with correct ordering
+    const { data: friendshipData, error: friendshipError } = await supabase
       .from('friendships')
       .delete()
-      .eq('user1_id', user.id)
-      .eq('user2_id', friendId)
+      .eq('user1_id', user1_id)
+      .eq('user2_id', user2_id)
       .select()
     
-    const { data: data2, error: error2 } = await supabase
-      .from('friendships')
-      .delete()
-      .eq('user1_id', friendId)
-      .eq('user2_id', user.id)
-      .select()
+    if (friendshipError) throw friendshipError
     
-    if (error1 && error2) {
-      throw new Error('Failed to remove friendship')
+    if (!friendshipData || friendshipData.length === 0) {
+      throw new Error('Friendship not found or already removed')
     }
     
-    if (!data1?.length && !data2?.length) {
-      throw new Error('Friendship not found')
-    }
-    
-    return { success: true, data: data1 || data2 }
+    return { success: true, data: friendshipData[0] }
   } catch (error) {
     console.error('Error removing friend:', error)
     return { success: false, error: error.message }
@@ -473,22 +497,18 @@ export const searchUsers = async (searchTerm) => {
       // For each user, check if they're already friends or have pending requests
       const enrichedUsers = await Promise.all(
         users.map(async (searchUser) => {
-          // Check if already friends (simplified)
-          const { data: friendship1 } = await supabase
+          // Check if already friends using correct ordering
+          const user1_id = user.id < searchUser.auth_id ? user.id : searchUser.auth_id
+          const user2_id = user.id < searchUser.auth_id ? searchUser.auth_id : user.id
+          
+          const { data: friendship } = await supabase
             .from('friendships')
             .select('id')
-            .eq('user1_id', user.id)
-            .eq('user2_id', searchUser.auth_id)
+            .eq('user1_id', user1_id)
+            .eq('user2_id', user2_id)
             .single()
           
-          const { data: friendship2 } = await supabase
-            .from('friendships')
-            .select('id')
-            .eq('user1_id', searchUser.auth_id)
-            .eq('user2_id', user.id)
-            .single()
-          
-          // Check if has pending request (simplified)
+          // Check if has pending request
           const { data: request1 } = await supabase
             .from('friend_requests')
             .select('id')
@@ -510,7 +530,7 @@ export const searchUsers = async (searchTerm) => {
             username: searchUser.user_name || '',
             user_level: searchUser.user_level || 1,
             profile_image: searchUser.profile_image || '',
-            is_friend: !!(friendship1 || friendship2),
+            is_friend: !!friendship,
             has_pending_request: !!(request1 || request2)
           }
         })

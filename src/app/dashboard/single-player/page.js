@@ -7,12 +7,14 @@ import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
 import GameSummary from '../components/GameSummary';
 import { generateTriviaQuestions } from '@/utils/openai';
+import { useNotifications } from '@/components/notifications/InGameNotificationProvider'
 
 function SinglePlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userLevel = searchParams.get('level') || 1;
   const supabase = getSupabase();
+  const { setGameActive } = useNotifications()
   
   useAutoLogout();
 
@@ -50,6 +52,20 @@ function SinglePlayerGame() {
     }
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
+
+  useEffect(() => {
+    // Activate notifications when game starts
+    if (gameState === 'playing') {
+      setGameActive(true)
+    } else {
+      setGameActive(false)
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      setGameActive(false)
+    }
+  }, [gameState, setGameActive])
 
   const handleCategoryToggle = (category) => {
     setSelectedCategories(prev => {

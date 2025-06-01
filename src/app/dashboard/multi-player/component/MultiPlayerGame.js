@@ -8,6 +8,7 @@ import GameSummary from "@/app/dashboard/components/GameSummary";
 import { generateTriviaQuestions } from "@/utils/openai";
 import { LevelingSystem } from "@/app/leveling/leveling-system";
 import LobbySystem from "./LobbySystem";
+import { useNotifications } from "@/components/notifications/InGameNotificationProvider";
 
 // Available quiz categories
 const categories = [
@@ -25,6 +26,7 @@ export default function MultiPlayerGame() {
   const lobbyId = searchParams.get("lobby");
   const userLevel = searchParams.get("level") || 1;
   const supabase = getSupabase();
+  const { setGameActive } = useNotifications();
 
   useAutoLogout();
 
@@ -272,6 +274,20 @@ export default function MultiPlayerGame() {
     }
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
+
+  useEffect(() => {
+    // Activate notifications when game starts playing
+    if (gameState === 'playing') {
+      setGameActive(true)
+    } else {
+      setGameActive(false)
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      setGameActive(false)
+    }
+  }, [gameState, setGameActive])
 
   if (gameState === "selection") {
     return <LobbySystem />;

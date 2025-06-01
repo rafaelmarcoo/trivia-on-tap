@@ -286,3 +286,22 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- SELECT * FROM get_user_friends('00000000-0000-0000-0000-000000000000');
 -- SELECT * FROM search_users_for_friends('00000000-0000-0000-0000-000000000000', 'test'); 
 -- SELECT * FROM get_friend_requests_with_users('00000000-0000-0000-0000-000000000000'); 
+
+-- 13. Create function to clean up friend request after acceptance
+CREATE OR REPLACE FUNCTION cleanup_accepted_friend_request(request_uuid UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    -- Delete the friend request (bypasses RLS since this runs as SECURITY DEFINER)
+    DELETE FROM friend_requests 
+    WHERE id = request_uuid 
+    AND status = 'accepted';
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    
+    RETURN deleted_count > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 14. Test the functions to make sure they work 
