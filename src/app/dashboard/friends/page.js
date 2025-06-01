@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2, MessageCircle } from 'lucide-react'
 import { checkAuth } from "@/utils/auth"
@@ -36,22 +36,60 @@ export default function FriendsPage() {
   const [showMobileChat, setShowMobileChat] = useState(false)
   
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // Check authentication on mount
+  // Check authentication on mount and handle URL parameters
   useEffect(() => {
     const checkUserAuth = async () => {
       const { isAuthenticated } = await checkAuth()
       if (!isAuthenticated) {
         router.push('/login')
+        return
+      }
+
+      // Handle conversation parameter from notifications
+      const conversationUserId = searchParams.get('conversation')
+      if (conversationUserId) {
+        setActiveTab('messages')
+        
+        // Wait a bit for the conversations to load, then auto-select
+        setTimeout(async () => {
+          // Create a conversation object for the selected user
+          // We'll need to fetch user details for this
+          try {
+            const { getSupabase } = await import('@/utils/supabase')
+            const supabase = getSupabase()
+            const { data: userData } = await supabase
+              .from('user')
+              .select('user_name, user_level, profile_image')
+              .eq('auth_id', conversationUserId)
+              .single()
+
+            if (userData) {
+              const fakeConversation = {
+                other_user_id: conversationUserId,
+                other_user_name: userData.user_name,
+                other_user_level: userData.user_level,
+                other_user_profile_image: userData.profile_image,
+                unread_count: 0
+              }
+              setSelectedConversation(fakeConversation)
+              setShowMobileChat(true)
+            }
+          } catch (error) {
+            console.error('Failed to load user for conversation:', error)
+          }
+        }, 500)
       }
     }
+    
     checkUserAuth()
     
     // Check URL hash to open specific tab
     if (window.location.hash === '#messages') {
       setActiveTab('messages')
     }
-  }, [router])
+  }, [router, searchParams])
 
   // Load unread message count
   useEffect(() => {
