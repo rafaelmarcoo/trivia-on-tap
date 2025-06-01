@@ -18,6 +18,7 @@ import {
 import { getUnreadMessageCount } from '@/utils/messages'
 import FriendChallengeModal from './components/FriendChallengeModal'
 import { ConversationsList, ChatWindow } from './components/MessagingComponents'
+import ChallengeInvitations from './components/ChallengeInvitations'
 
 function FriendsPageContent() {
   const [activeTab, setActiveTab] = useState('friends')
@@ -29,6 +30,7 @@ function FriendsPageContent() {
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [challengeModal, setChallengeModal] = useState({ isOpen: false, friend: null })
+  const [pendingChallengesCount, setPendingChallengesCount] = useState(0)
   
   // Messaging state
   const [selectedConversation, setSelectedConversation] = useState(null)
@@ -281,6 +283,11 @@ function FriendsPageContent() {
     // router.push(`/dashboard/multi-player?lobby=${lobbyData.id}`)
   }
 
+  const handleChallengeAccepted = (lobbyId) => {
+    setSuccessMessage('Challenge accepted! Starting game...')
+    setTimeout(() => setSuccessMessage(''), 3000)
+  }
+
   // Messaging handlers
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation)
@@ -484,6 +491,12 @@ function FriendsPageContent() {
               count={friendRequests.received.length}
             />
             <TabButton 
+              tab="challenges" 
+              icon={Trophy} 
+              label="Challenges" 
+              count={pendingChallengesCount}
+            />
+            <TabButton 
               tab="messages" 
               icon={MessageCircle} 
               label="Messages" 
@@ -494,6 +507,13 @@ function FriendsPageContent() {
 
           {/* Tab Content */}
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Challenges Tab */}
+            {activeTab === 'challenges' && (
+              <div className="p-6">
+                <ChallengeInvitations onChallengeAccepted={handleChallengeAccepted} />
+              </div>
+            )}
+
             {/* Messages Tab */}
             {activeTab === 'messages' && (
               <div className="h-[600px] flex">
