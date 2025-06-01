@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2, MessageCircle } from 'lucide-react'
@@ -19,7 +19,7 @@ import { getUnreadMessageCount } from '@/utils/messages'
 import FriendChallengeModal from './components/FriendChallengeModal'
 import { ConversationsList, ChatWindow } from './components/MessagingComponents'
 
-export default function FriendsPage() {
+function FriendsPageContent() {
   const [activeTab, setActiveTab] = useState('friends')
   const [friends, setFriends] = useState([])
   const [friendRequests, setFriendRequests] = useState({ received: [], sent: [] })
@@ -667,5 +667,20 @@ export default function FriendsPage() {
         onChallengeSent={handleChallengeSent}
       />
     </>
+  )
+}
+
+export default function FriendsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+          <p className="text-amber-800 font-medium">Loading Friends...</p>
+        </div>
+      </div>
+    }>
+      <FriendsPageContent />
+    </Suspense>
   )
 } 
