@@ -24,9 +24,12 @@ function FriendChallengeGameContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [gameResults, setGameResults] = useState(null)
+  const [selectedAnswer, setSelectedAnswer] = useState(null)
+  const [isAnswered, setIsAnswered] = useState(false)
+  const [userInput, setUserInput] = useState("")
 
   const currentQuestion = questions[currentQuestionIndex]
-  const totalQuestions = 10 // Fixed number for challenges
+  const totalQuestions = 10 // Fixed to 10 questions like single-player with 20 but scaled down
 
   // Get current user and initialize
   useEffect(() => {
@@ -93,17 +96,17 @@ function FriendChallengeGameContent() {
   // Timer for questions
   useEffect(() => {
     let timer
-    if (gameState === 'playing' && timeLeft > 0) {
+    if (gameState === 'playing' && timeLeft > 0 && !isAnswered) {
       timer = setTimeout(() => {
         setTimeLeft(timeLeft - 1)
       }, 1000)
-    } else if (gameState === 'playing' && timeLeft === 0) {
+    } else if (gameState === 'playing' && timeLeft === 0 && !isAnswered) {
       // Auto-submit when time runs out
       handleNextQuestion()
     }
 
     return () => clearTimeout(timer)
-  }, [timeLeft, gameState])
+  }, [timeLeft, gameState, isAnswered])
 
   const loadLobbyData = async (userId) => {
     try {
@@ -161,7 +164,7 @@ function FriendChallengeGameContent() {
 
       // Only the host generates and stores questions
       if (lobbyData.host_id === currentUserId) {
-        // Generate questions
+        // Generate questions - using the selected categories and difficulty from challenge
         const generatedQuestions = await generateTriviaQuestions(
           lobbyData.categories || ['general'],
           lobbyData.difficulty || 'medium',
@@ -176,7 +179,8 @@ function FriendChallengeGameContent() {
             lobby_id: lobbyId,
             total_questions: totalQuestions,
             categories: lobbyData.categories,
-            difficulty_level: lobbyData.difficulty === 'easy' ? 1 : lobbyData.difficulty === 'hard' ? 3 : 2
+            difficulty_level: lobbyData.difficulty === 'easy' ? 1 : lobbyData.difficulty === 'hard' ? 3 : 2,
+            time_per_question: 30
           })
           .select()
           .single()
@@ -295,11 +299,14 @@ function FriendChallengeGameContent() {
     }
   }
 
-  const handleAnswer = async (selectedAnswer) => {
-    if (!currentQuestion || myAnswers[currentQuestion.id]) return
+  const handleAnswer = async (answer) => {
+    if (isAnswered || myAnswers[currentQuestion.id]) return
 
     const timeTaken = 30 - timeLeft
-    const isCorrect = selectedAnswer === currentQuestion.correct_answer
+    const isCorrect = answer === currentQuestion.correct_answer
+
+    setSelectedAnswer(answer)
+    setIsAnswered(true)
 
     try {
       // Save answer to database
@@ -309,7 +316,7 @@ function FriendChallengeGameContent() {
           lobby_id: lobbyId,
           user_id: currentUserId,
           question_id: currentQuestion.id,
-          user_answer: selectedAnswer,
+          user_answer: answer,
           is_correct: isCorrect,
           time_taken: timeTaken
         })
@@ -318,26 +325,42 @@ function FriendChallengeGameContent() {
       setMyAnswers(prev => ({
         ...prev,
         [currentQuestion.id]: {
-          user_answer: selectedAnswer,
+          user_answer: answer,
           is_correct: isCorrect,
           time_taken: timeTaken
         }
       }))
-
-      // Move to next question after a short delay
-      setTimeout(() => {
-        handleNextQuestion()
-      }, 1500)
     } catch (err) {
       console.error('Error saving answer:', err)
       setError('Failed to save answer')
     }
   }
 
+  const handleInputAnswer = (e) => {
+    e.preventDefault()
+    if (isAnswered || !userInput.trim()) return
+
+    let correct = false
+    if (currentQuestion.question_type === "math") {
+      const userNum = parseFloat(userInput.trim())
+      const correctNum = parseFloat(currentQuestion.correct_answer.trim())
+      correct = Math.abs(userNum - correctNum) < 0.01
+    } else {
+      const userAns = userInput.trim().toLowerCase().replace(/\.$/, "")
+      const correctAns = currentQuestion.correct_answer.trim().toLowerCase().replace(/\.$/, "")
+      correct = userAns === correctAns
+    }
+
+    handleAnswer(userInput)
+  }
+
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1)
       setTimeLeft(30)
+      setSelectedAnswer(null)
+      setIsAnswered(false)
+      setUserInput("")
     } else {
       finishGame()
     }
@@ -365,20 +388,95 @@ function FriendChallengeGameContent() {
     }
   }
 
-  const getAnswerStyle = (option, questionId) => {
-    const myAnswer = myAnswers[questionId]
-    const question = questions.find(q => q.id === questionId)
-    
-    if (!myAnswer) {
-      return 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-    }
+  const renderQuestionType = () => {
+    if (!currentQuestion) return null
 
-    if (option === question.correct_answer) {
-      return 'bg-green-500 text-white'
-    } else if (option === myAnswer.user_answer) {
-      return 'bg-red-500 text-white'
-    } else {
-      return 'bg-gray-100 text-gray-700'
+    const answered = myAnswers[currentQuestion.id]
+    
+    switch (currentQuestion.question_type) {
+      case "multiple-choice":
+        return (
+          <div className="grid grid-cols-1 gap-3">
+            {currentQuestion.options.map((option, index) => (
+              <button
+                key={index}
+                onClick={() => handleAnswer(option)}
+                disabled={isAnswered}
+                className={`p-4 rounded-lg border-2 text-left transition-all duration-200 ${
+                  answered
+                    ? option === currentQuestion.correct_answer
+                      ? "bg-green-100 border-green-500 text-green-800"
+                      : answered.user_answer === option
+                      ? "bg-red-100 border-red-500 text-red-800"
+                      : "bg-gray-100 border-gray-300 text-gray-600"
+                    : "border-amber-200 hover:border-amber-300 hover:bg-amber-50"
+                } disabled:cursor-not-allowed`}
+              >
+                <span className="font-medium">{String.fromCharCode(65 + index)}. </span>
+                {option}
+              </button>
+            ))}
+          </div>
+        )
+
+      case "true-false":
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            {currentQuestion.options.map((option, index) => (
+              <button
+                key={index}
+                onClick={() => handleAnswer(option)}
+                disabled={isAnswered}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                  answered
+                    ? option === currentQuestion.correct_answer
+                      ? "bg-green-100 border-green-500 text-green-800"
+                      : answered.user_answer === option
+                      ? "bg-red-100 border-red-500 text-red-800"
+                      : "bg-gray-100 border-gray-300 text-gray-600"
+                    : "border-amber-200 hover:border-amber-300 hover:bg-amber-50"
+                } disabled:cursor-not-allowed`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )
+
+      case "one-word":
+      case "math":
+        return (
+          <form onSubmit={handleInputAnswer} className="space-y-4">
+            <input
+              type="text"
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              disabled={isAnswered}
+              className={`w-full p-4 rounded-lg border-2 ${
+                answered
+                  ? answered.is_correct
+                    ? "border-green-500 bg-green-50"
+                    : "border-red-500 bg-red-50"
+                  : "border-amber-200 focus:border-amber-500 focus:outline-none"
+              }`}
+              placeholder={
+                currentQuestion.question_type === "math"
+                  ? "Enter your answer (numbers only)"
+                  : "Enter your answer"
+              }
+            />
+            <button
+              type="submit"
+              disabled={isAnswered || !userInput.trim()}
+              className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              Submit Answer
+            </button>
+          </form>
+        )
+
+      default:
+        return null
     }
   }
 
@@ -488,56 +586,36 @@ function FriendChallengeGameContent() {
 
             {/* Question */}
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
                 {currentQuestion.question_text}
               </h2>
 
               {/* Answer Options */}
-              <div className="space-y-3">
-                {currentQuestion.options?.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleAnswer(option)}
-                    disabled={myAnswers[currentQuestion.id]}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all duration-200 ${
-                      myAnswers[currentQuestion.id]
-                        ? getAnswerStyle(option, currentQuestion.id)
-                        : 'border-amber-200 hover:border-amber-300 hover:bg-amber-50'
-                    } disabled:cursor-not-allowed`}
-                  >
-                    <span className="font-medium">{String.fromCharCode(65 + index)}. </span>
-                    {option}
-                  </button>
-                )) || (
-                  <input
-                    type="text"
-                    placeholder="Type your answer..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target.value.trim()) {
-                        handleAnswer(e.target.value.trim())
-                      }
-                    }}
-                    disabled={myAnswers[currentQuestion.id]}
-                    className="w-full p-4 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:outline-none"
-                  />
-                )}
-              </div>
+              {renderQuestionType()}
 
               {/* Answer Status */}
-              {myAnswers[currentQuestion.id] && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle 
-                      className={myAnswers[currentQuestion.id].is_correct ? 'text-green-500' : 'text-red-500'} 
-                      size={20} 
-                    />
-                    <span className="font-medium">
-                      {myAnswers[currentQuestion.id].is_correct ? 'Correct!' : 'Incorrect'}
-                    </span>
+              {isAnswered && myAnswers[currentQuestion.id] && (
+                <div className="mt-6 space-y-4">
+                  <div>
+                    {myAnswers[currentQuestion.id].is_correct ? (
+                      <div className="text-green-700 font-bold text-lg">✅ Correct!</div>
+                    ) : (
+                      <div className="text-red-700 font-bold text-lg">
+                        ❌ Incorrect. The correct answer was: {currentQuestion.correct_answer}
+                      </div>
+                    )}
                   </div>
                   {currentQuestion.explanation && (
-                    <p className="text-sm text-gray-600">{currentQuestion.explanation}</p>
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-blue-800">{currentQuestion.explanation}</p>
+                    </div>
                   )}
+                  <button
+                    onClick={handleNextQuestion}
+                    className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition-colors"
+                  >
+                    {currentQuestionIndex === questions.length - 1 ? "See Results" : "Next Question"}
+                  </button>
                 </div>
               )}
             </div>
