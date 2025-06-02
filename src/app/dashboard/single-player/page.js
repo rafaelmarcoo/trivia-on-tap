@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle } from 'lucide-react';
 import { useAutoLogout, getSupabase } from '@/utils/supabase';
 import CategoryChecklist from './components/CategoryChecklist';
 import QuestionDisplay from './components/QuestionDisplay';
 import GameSummary from '../components/GameSummary';
 import { generateTriviaQuestions } from '@/utils/openai';
+import { useNotifications } from '@/components/notifications/InGameNotificationProvider'
 
 function SinglePlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userLevel = searchParams.get('level') || 1;
   const supabase = getSupabase();
+  const { setGameActive } = useNotifications()
   
   useAutoLogout();
 
@@ -50,6 +53,20 @@ function SinglePlayerGame() {
     }
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
+
+  useEffect(() => {
+    // Activate notifications when game starts
+    if (gameState === 'playing') {
+      setGameActive(true)
+    } else {
+      setGameActive(false)
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      setGameActive(false)
+    }
+  }, [gameState, setGameActive])
 
   const handleCategoryToggle = (category) => {
     setSelectedCategories(prev => {
@@ -172,95 +189,132 @@ function SinglePlayerGame() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-8 min-h-screen bg-[var(--color-primary)]">
-      <button
-        onClick={() => router.push('/dashboard')}
-        className="mb-4 px-4 py-2 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-md flex items-center gap-2"
-      >
-        <span>←</span> Back to Dashboard
-      </button>
-      
-      {gameState === 'selection' ? (
-        <>
-          <h1 className="text-4xl text-center mb-8 text-[var(--color-fourth)]">
-            Single Player Mode
-          </h1>
-          
-          <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl mb-4 text-[var(--color-fourth)]">
-              Select Categories
-            </h2>
-            <p className="text-[var(--color-fourth)]/80 mb-8">
-              Choose the categories you want to play with. You can select multiple categories.
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 text-amber-700 hover:text-amber-900 transition-colors"
+          >
+            <ArrowLeft size={18} />
+            <span>Back to Dashboard</span>
+          </button>
+          <h1 className="text-2xl font-bold text-amber-900">Single Player</h1>
+        </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+        
+        {gameState === 'selection' ? (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="text-center mb-8">
+              <Trophy className="mx-auto mb-4 text-amber-500" size={64} />
+              <h2 className="text-3xl font-bold text-amber-900 mb-2">
+                Ready to Test Your Knowledge?
+              </h2>
+              <p className="text-amber-700 text-lg">
+                Choose your categories and show us what you know!
+              </p>
+            </div>
             
-            <CategoryChecklist 
-              selectedCategories={selectedCategories}
-              onCategoryToggle={handleCategoryToggle}
-            />
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-amber-900 mb-4">
+                Select Categories
+              </h3>
+              <p className="text-amber-700 mb-6">
+                Choose the categories you want to play with. You can select multiple categories for a diverse challenge.
+              </p>
+              
+              <CategoryChecklist 
+                selectedCategories={selectedCategories}
+                onCategoryToggle={handleCategoryToggle}
+              />
+            </div>
             
             <button 
-              className={`w-full py-4 px-8 rounded-lg text-lg ${
+              className={`w-full py-4 px-8 rounded-lg text-lg font-semibold transition-all duration-200 ${
                 selectedCategories.length > 0 
-                  ? 'bg-[var(--color-tertiary)] cursor-pointer' 
-                  : 'bg-[var(--color-fourth)] cursor-not-allowed'
-              } text-[var(--color-primary)]`}
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md transform hover:scale-105' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
               onClick={startGame}
               disabled={selectedCategories.length === 0 || isLoading}
             >
-              {isLoading ? 'Loading...' : 'Start Game'}
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Generating Questions...
+                </div>
+              ) : (
+                `Start Game (${selectedCategories.length} ${selectedCategories.length === 1 ? 'category' : 'categories'})`
+              )}
             </button>
           </div>
-        </>
-      ) : gameState === 'summary' ? (
-        <GameSummary
-          gameData={gameSummary}
-          onAction={() => setGameState('selection')}
-          actionLabel="Play Again"
-          showCategories={true}
-        />
-      ) : (
-        <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl text-[var(--color-fourth)]">
-                Score: {score}
-              </h2>
-              <p className="text-[var(--color-fourth)]">Time left: {timeLeft}s</p>
-              <p className="text-[var(--color-fourth)]">Question {currentQuestionIndex + 1} of {questions.length}</p>
+        ) : gameState === 'summary' ? (
+          <GameSummary
+            gameData={gameSummary}
+            onAction={() => setGameState('selection')}
+            actionLabel="Play Again"
+            showCategories={true}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Game Progress Info */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="text-amber-500" size={24} />
+                    <span className="text-xl font-bold text-amber-900">
+                      Score: {score}/{questions.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-red-600">
+                    <Clock size={20} />
+                    <span className="font-mono font-bold text-lg">{timeLeft}s</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-amber-700">
+                    Question {currentQuestionIndex + 1} of {questions.length}
+                  </div>
+                  <button
+                    onClick={endGame}
+                    className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                  >
+                    End Game
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={endGame}
-              className="px-4 py-2 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-md"
-            >
-              End Game
-            </button>
+
+            {/* Question Card */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+                  <p className="text-amber-800 font-medium">Loading questions...</p>
+                </div>
+              ) : currentQuestion ? (
+                <QuestionDisplay
+                  type={currentQuestion.type}
+                  question={currentQuestion.question}
+                  options={currentQuestion.options}
+                  correctAnswer={currentQuestion.correctAnswer}
+                  explanation={currentQuestion.explanation}
+                  onAnswer={handleAnswer}
+                  onNextQuestion={handleNextQuestion}
+                  isLastQuestion={currentQuestionIndex === questions.length - 1}
+                />
+              ) : null}
+            </div>
           </div>
-
-          {error && (
-            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-[var(--color-fourth)]">Loading questions...</p>
-            </div>
-          ) : currentQuestion ? (
-            <QuestionDisplay
-              type={currentQuestion.type}
-              question={currentQuestion.question}
-              options={currentQuestion.options}
-              correctAnswer={currentQuestion.correctAnswer}
-              explanation={currentQuestion.explanation}
-              onAnswer={handleAnswer}
-              onNextQuestion={handleNextQuestion}
-              isLastQuestion={currentQuestionIndex === questions.length - 1}
-            />
-          ) : null}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -268,8 +322,11 @@ function SinglePlayerGame() {
 export default function SinglePlayerPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
-        <div className="animate-pulse text-[var(--color-fourth)] text-xl">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-amber-600 mx-auto mb-4"></div>
+          <p className="text-amber-800 font-medium">Loading Single Player...</p>
+        </div>
       </div>
     }>
       <SinglePlayerGame />

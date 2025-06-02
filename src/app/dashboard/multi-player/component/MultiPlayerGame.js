@@ -8,6 +8,7 @@ import GameSummary from "@/app/dashboard/components/GameSummary";
 import { generateTriviaQuestions } from "@/utils/openai";
 import { LevelingSystem } from "@/app/leveling/leveling-system";
 import LobbySystem from "./LobbySystem";
+import { useNotifications } from "@/components/notifications/InGameNotificationProvider";
 
 // Available quiz categories
 const categories = [
@@ -26,6 +27,7 @@ export default function MultiPlayerGame() {
   const sessionId = searchParams.get("session");
   const userLevel = searchParams.get("level") || 1;
   const supabase = getSupabase();
+  const { setGameActive } = useNotifications();
 
   useAutoLogout();
 
@@ -503,7 +505,6 @@ export default function MultiPlayerGame() {
     const matchmake = async () => {
       setIsLoading(true);
       setError(null);
-
       try {
         // Get current user
         const {
@@ -570,8 +571,22 @@ export default function MultiPlayerGame() {
     if (!lobbyId) {
       matchmake();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lobbyId]);
+
+  // Notification effect
+  useEffect(() => {
+    // Activate notifications when game starts playing
+    if (gameState === "playing") {
+      setGameActive(true);
+    } else {
+      setGameActive(false);
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      setGameActive(false);
+    };
+  }, [gameState, setGameActive]);
 
   // Listen for lobby status change to start game automatically
   useEffect(() => {
@@ -610,7 +625,6 @@ export default function MultiPlayerGame() {
 
       fetchQuestionsAndStart();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lobbyData?.status]);
 
   if (gameState === "selection") {

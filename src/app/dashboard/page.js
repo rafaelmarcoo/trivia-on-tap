@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabase, useAutoLogout } from "@/utils/supabase"
+import { handleLogout, checkAuth } from "@/utils/auth"
+import { getUnreadMessageCount } from "@/utils/messages"
 import { User } from "lucide-react"
 
 export default function Dashboard() {
@@ -10,34 +12,69 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("")
   const [profileImage, setProfileImage] = useState(null)
   const [status, setStatus] = useState("")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const router = useRouter()
   const supabase = getSupabase()
 
-  useAutoLogout()
+  useAutoLogout({
+    onLogout: () => {
+      router.push('/login')
+    }
+  })
 
   useEffect(() => {
-    const savedImage = localStorage.getItem('profileImage')
-    if (savedImage) {
-      setProfileImage(savedImage)
+    const loadProfileImage = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: userData } = await supabase
+            .from('user')
+            .select('profile_image')
+            .eq('auth_id', user.id)
+            .single()
+
+          if (userData?.profile_image) {
+            setProfileImage(userData.profile_image)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile image:', error)
+      }
+    }
+
+    loadProfileImage()
+  }, [supabase])
+
+  const loadUnreadMessageCount = useCallback(async () => {
+    try {
+      const { isAuthenticated } = await checkAuth()
+      if (isAuthenticated) {
+        const result = await getUnreadMessageCount()
+        if (result.success) {
+          setUnreadMessageCount(result.data.count)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load unread message count:', err)
     }
   }, [])
 
   const getUser = useCallback(async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      const { isAuthenticated, session } = await checkAuth()
       
-      if (authError) throw authError
-      if (!user) {
+      if (!isAuthenticated) {
         router.push("/login")
         return
       }
 
-      setUser(user)
+      setUser(session.user)
 
       const { data: userData, error: userError } = await supabase
         .from("user") 
         .select("user_name, user_level, status")
-        .eq("auth_id", user.id)
+        .eq("auth_id", session.user.id)
         .single()
 
       if (userError) throw userError
@@ -47,24 +84,26 @@ export default function Dashboard() {
         setUserLevel(userData.user_level || 1)
         setStatus(userData.status || "Feeling smart!")
       }
+
+      // Load unread message count after user is loaded
+      loadUnreadMessageCount()
     } catch (error) {
       console.error("Error fetching user data:", error)
     }
-  }, [router, supabase])
+  }, [router, supabase, loadUnreadMessageCount])
 
   useEffect(() => {
     getUser()
   }, [getUser])
 
-  const handleLogout = async () => {
+  const onLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      router.refresh()
-      router.push("/login")
+      setIsLoggingOut(true)
+      const { success, error } = await handleLogout(router)
+      if (!success) throw new Error(error)
     } catch (error) {
       console.error("Error logging out:", error.message)
+      setIsLoggingOut(false)
     }
   }
 
@@ -103,11 +142,12 @@ export default function Dashboard() {
         <button
           onClick={(e) => {
             e.stopPropagation()
-            handleLogout()
+            onLogout()
           }}
-          className="text-sm text-red-600 transfrom hover:text-red-800 transition-colors duration-200 ml-auto"
+          disabled={isLoggingOut}
+          className="text-sm text-red-600 transform hover:text-red-800 transition-colors duration-200 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Logout
+          {isLoggingOut ? 'Logging out...' : 'Logout'}
         </button>
       </div>
       {status && (
@@ -149,6 +189,32 @@ export default function Dashboard() {
           >
             <span className="text-xl">📊</span>
             <span>Game History</span>
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/friends")}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3 relative"
+          >
+            <span className="text-xl">👥</span>
+            <span>Friends</span>
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {unreadMessageCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              router.push("/dashboard/friends#messages")
+            }}
+            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3 relative"
+          >
+            <span className="text-xl">💬</span>
+            <span>Messages</span>
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                {unreadMessageCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => router.push("/dashboard/tutorial")}

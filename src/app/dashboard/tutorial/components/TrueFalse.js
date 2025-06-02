@@ -57,14 +57,14 @@ export default function TrueFalse({ onNext }) {
             <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg border border-green-200">
               <div className="flex-1">
                 <p className="text-green-800 font-medium">True Answer</p>
-                <p className="text-green-600 text-sm">When you select "True", the button will be highlighted in green</p>
+                <p className="text-green-600 text-sm">When you select &quot;True&quot;, the button will be highlighted in green</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 p-3 bg-red-50 rounded-lg border border-red-200">
               <div className="flex-1">
                 <p className="text-red-800 font-medium">False Answer</p>
-                <p className="text-red-600 text-sm">When you select "False", the button will be highlighted in red</p>
+                <p className="text-red-600 text-sm">When you select &quot;False&quot;, the button will be highlighted in red</p>
               </div>
             </div>
           </div>
