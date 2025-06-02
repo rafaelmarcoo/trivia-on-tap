@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
@@ -12,7 +12,7 @@ function FriendChallengeGameContent() {
   const lobbyId = searchParams.get('lobby')
   const supabase = getSupabase()
 
-  const [gameState, setGameState] = useState('loading') // 'loading' | 'waiting' | 'playing' | 'finished'
+  const [gameState, setGameState] = useState('loading') // 'loading' | 'waiting' | 'playing' | 'waiting_for_opponent' | 'finished'
   const [lobbyData, setLobbyData] = useState(null)
   const [questions, setQuestions] = useState([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -27,6 +27,8 @@ function FriendChallengeGameContent() {
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [isAnswered, setIsAnswered] = useState(false)
   const [userInput, setUserInput] = useState("")
+  
+  const pollIntervalRef = useRef(null)
 
   const currentQuestion = questions[currentQuestionIndex]
   const totalQuestions = 10 // Fixed to 10 questions like single-player with 20 but scaled down
@@ -84,6 +86,14 @@ function FriendChallengeGameContent() {
             loadOpponentAnswers(opponentData.id)
           }
         }
+        
+        // If we're waiting for opponent and they just answered, check if both are done
+        if (gameState === 'waiting_for_opponent' && payload.new && payload.new.user_id !== currentUserId) {
+          console.log('Opponent answered while we are waiting, checking if both finished...')
+          setTimeout(() => {
+            checkIfBothPlayersFinished()
+          }, 500) // Small delay to ensure database is updated
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -122,6 +132,16 @@ function FriendChallengeGameContent() {
 
     return () => clearTimeout(timer)
   }, [timeLeft, gameState, isAnswered])
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [])
 
   const loadLobbyData = async (userId) => {
     try {
@@ -443,17 +463,67 @@ function FriendChallengeGameContent() {
     if (isAnswered || !userInput.trim()) return
 
     let correct = false
+    let finalAnswer = userInput.trim() // Store the user's trimmed input
+    
     if (currentQuestion.question_type === "math") {
       const userNum = parseFloat(userInput.trim())
       const correctNum = parseFloat(currentQuestion.correct_answer.trim())
       correct = Math.abs(userNum - correctNum) < 0.01
     } else {
+      // Case-insensitive comparison with whitespace and period handling
       const userAns = userInput.trim().toLowerCase().replace(/\.$/, "")
       const correctAns = currentQuestion.correct_answer.trim().toLowerCase().replace(/\.$/, "")
       correct = userAns === correctAns
+      
+      // Debug logging
+      console.log('Answer comparison:', {
+        userInput: userInput,
+        userAns: userAns,
+        correctAns: correctAns,
+        correct: correct
+      })
     }
 
-    handleAnswer(userInput)
+    // Pass the user's actual input, but the function will use the correct boolean we calculated
+    setSelectedAnswer(finalAnswer)
+    setIsAnswered(true)
+
+    const timeTaken = 30 - timeLeft
+    
+    // Save answer directly here instead of calling handleAnswer to avoid confusion
+    if (!currentUserId) {
+      console.error('No user ID available for saving answer')
+      setError('Unable to save answer - please refresh the page')
+      return
+    }
+
+    // Update UI immediately
+    setMyAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: {
+        user_answer: finalAnswer,
+        is_correct: correct,
+        time_taken: timeTaken
+      }
+    }))
+
+    // Save to database
+    supabase
+      .from('friend_challenge_answers')
+      .insert({
+        lobby_id: lobbyId,
+        user_id: currentUserId,
+        question_id: currentQuestion.id,
+        user_answer: finalAnswer,
+        is_correct: correct,
+        time_taken: timeTaken
+      })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Error saving answer:', error)
+          setError('Failed to save answer')
+        }
+      })
   }
 
   const handleNextQuestion = () => {
@@ -464,6 +534,97 @@ function FriendChallengeGameContent() {
       setIsAnswered(false)
       setUserInput("")
     } else {
+      // Player finished all questions - check if opponent is also done
+      checkIfBothPlayersFinished()
+    }
+  }
+
+  const checkIfBothPlayersFinished = async () => {
+    try {
+      console.log('Checking if both players finished...')
+      
+      // Force refresh opponent answers first
+      if (opponentData?.id) {
+        await loadOpponentAnswers(opponentData.id)
+      }
+      
+      // Count how many answers each player has with fresh data
+      const { data: allAnswers, error } = await supabase
+        .from('friend_challenge_answers')
+        .select('user_id')
+        .eq('lobby_id', lobbyId)
+
+      if (error) throw error
+
+      const myAnswerCount = allAnswers.filter(a => a.user_id === currentUserId).length
+      const opponentAnswerCount = allAnswers.filter(a => a.user_id === opponentData?.id).length
+
+      console.log(`Fresh answer counts - Me: ${myAnswerCount}, Opponent: ${opponentAnswerCount}, Total questions: ${totalQuestions}`)
+      console.log('All answers:', allAnswers)
+
+      if (myAnswerCount >= totalQuestions && opponentAnswerCount >= totalQuestions) {
+        // Both players finished - show results
+        console.log('Both players finished, showing results...')
+        // Clear any existing polling
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current)
+          pollIntervalRef.current = null
+        }
+        finishGame()
+      } else {
+        // Only start waiting/polling if we're not already doing it
+        if (gameState !== 'waiting_for_opponent') {
+          console.log('Waiting for opponent to finish...')
+          setGameState('waiting_for_opponent')
+        }
+        
+        // Clear any existing interval
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current)
+        }
+        
+        // Start polling for opponent completion
+        pollIntervalRef.current = setInterval(async () => {
+          try {
+            console.log('Polling for opponent completion...')
+            const { data: updatedAnswers, error: pollError } = await supabase
+              .from('friend_challenge_answers')
+              .select('user_id')
+              .eq('lobby_id', lobbyId)
+
+            if (pollError) throw pollError
+
+            const updatedMyCount = updatedAnswers.filter(a => a.user_id === currentUserId).length
+            const updatedOpponentCount = updatedAnswers.filter(a => a.user_id === opponentData?.id).length
+            
+            console.log(`Polling - Me: ${updatedMyCount}, Opponent: ${updatedOpponentCount}`)
+
+            if (updatedMyCount >= totalQuestions && updatedOpponentCount >= totalQuestions) {
+              console.log('Opponent finished! Showing results...')
+              clearInterval(pollIntervalRef.current)
+              pollIntervalRef.current = null
+              finishGame()
+            }
+          } catch (err) {
+            console.error('Error polling for opponent completion:', err)
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+          }
+        }, 2000) // Poll every 2 seconds
+
+        // Clear interval after 5 minutes to avoid infinite polling
+        setTimeout(() => {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+            console.log('Polling timeout - showing results anyway')
+            finishGame()
+          }
+        }, 300000) // 5 minutes
+      }
+    } catch (err) {
+      console.error('Error checking player completion:', err)
+      // Fallback to showing results
       finishGame()
     }
   }
@@ -671,6 +832,23 @@ function FriendChallengeGameContent() {
           </div>
         )}
 
+        {gameState === 'waiting_for_opponent' && (
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="animate-pulse mb-4">
+              <Trophy className="mx-auto text-amber-500" size={64} />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Waiting for {opponentData?.username} to finish...
+            </h2>
+            <p className="text-gray-600 mb-4">
+              You&apos;ve completed all questions! Waiting for your opponent to finish their game.
+            </p>
+            <div className="text-sm text-amber-600">
+              <p>Your Score: {Object.values(myAnswers).filter(a => a.is_correct).length}/{totalQuestions}</p>
+            </div>
+          </div>
+        )}
+
         {gameState === 'playing' && currentQuestion && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             {/* Question Header */}
@@ -749,7 +927,7 @@ function FriendChallengeGameContent() {
             </div>
 
             {gameResults.is_tie ? (
-              <p className="text-lg text-gray-600 mb-6">It's a tie! Great game!</p>
+              <p className="text-lg text-gray-600 mb-6">It&apos;s a tie! Great game!</p>
             ) : (
               <p className="text-lg text-gray-600 mb-6">
                 {gameResults.winner_id === currentUserId ? 'You won!' : `${opponentData?.username} won!`} 🎉
