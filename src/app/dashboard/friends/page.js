@@ -90,6 +90,8 @@ function FriendsPageContent() {
     // Check URL hash to open specific tab
     if (window.location.hash === '#messages') {
       setActiveTab('messages')
+    } else if (window.location.hash === '#challenges') {
+      setActiveTab('challenges')
     }
   }, [router, searchParams])
 

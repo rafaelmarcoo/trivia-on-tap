@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
 import { generateTriviaQuestions } from '@/utils/openai'
@@ -27,6 +28,7 @@ function FriendChallengeGameContent() {
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [isAnswered, setIsAnswered] = useState(false)
   const [userInput, setUserInput] = useState("")
+  const [currentUserProfileImage, setCurrentUserProfileImage] = useState(null)
   
   const pollIntervalRef = useRef(null)
 
@@ -51,6 +53,18 @@ function FriendChallengeGameContent() {
 
         console.log('Initializing challenge for user:', user.id)
         setCurrentUserId(user.id)
+        
+        // Load current user's profile image
+        const { data: userData } = await supabase
+          .from('user')
+          .select('profile_image')
+          .eq('auth_id', user.id)
+          .single()
+        
+        if (userData?.profile_image) {
+          setCurrentUserProfileImage(userData.profile_image)
+        }
+        
         await loadLobbyData(user.id)
       } catch (err) {
         console.error('Error initializing:', err)
@@ -431,17 +445,21 @@ function FriendChallengeGameContent() {
     setIsAnswered(true)
 
     try {
-      // Save answer to database
-      await supabase
+      // Save answer to database with ON CONFLICT to handle duplicates
+      const { error } = await supabase
         .from('friend_challenge_answers')
-        .insert({
+        .upsert({
           lobby_id: lobbyId,
           user_id: userId,
           question_id: currentQuestion.id,
           user_answer: answer,
           is_correct: isCorrect,
           time_taken: timeTaken
+        }, {
+          onConflict: 'lobby_id,user_id,question_id'
         })
+
+      if (error) throw error
 
       // Update local state
       setMyAnswers(prev => ({
@@ -510,13 +528,15 @@ function FriendChallengeGameContent() {
     // Save to database
     supabase
       .from('friend_challenge_answers')
-      .insert({
+      .upsert({
         lobby_id: lobbyId,
         user_id: currentUserId,
         question_id: currentQuestion.id,
         user_answer: finalAnswer,
         is_correct: correct,
         time_taken: timeTaken
+      }, {
+        onConflict: 'lobby_id,user_id,question_id'
       })
       .then(({ error }) => {
         if (error) {
@@ -551,13 +571,25 @@ function FriendChallengeGameContent() {
       // Count how many answers each player has with fresh data
       const { data: allAnswers, error } = await supabase
         .from('friend_challenge_answers')
-        .select('user_id')
+        .select('user_id, question_id')
         .eq('lobby_id', lobbyId)
 
       if (error) throw error
 
-      const myAnswerCount = allAnswers.filter(a => a.user_id === currentUserId).length
-      const opponentAnswerCount = allAnswers.filter(a => a.user_id === opponentData?.id).length
+      // Count unique question IDs answered by each player
+      const myQuestionIds = new Set(
+        allAnswers
+          .filter(a => a.user_id === currentUserId)
+          .map(a => a.question_id)
+      )
+      const opponentQuestionIds = new Set(
+        allAnswers
+          .filter(a => a.user_id === opponentData?.id)
+          .map(a => a.question_id)
+      )
+
+      const myAnswerCount = myQuestionIds.size
+      const opponentAnswerCount = opponentQuestionIds.size
 
       console.log(`Fresh answer counts - Me: ${myAnswerCount}, Opponent: ${opponentAnswerCount}, Total questions: ${totalQuestions}`)
       console.log('All answers:', allAnswers)
@@ -571,16 +603,15 @@ function FriendChallengeGameContent() {
           pollIntervalRef.current = null
         }
         finishGame()
-      } else {
+      } else if (gameState !== 'waiting_for_opponent') {
         // Only start waiting/polling if we're not already doing it
-        if (gameState !== 'waiting_for_opponent') {
-          console.log('Waiting for opponent to finish...')
-          setGameState('waiting_for_opponent')
-        }
+        console.log('Waiting for opponent to finish...')
+        setGameState('waiting_for_opponent')
         
         // Clear any existing interval
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current)
+          pollIntervalRef.current = null
         }
         
         // Start polling for opponent completion
@@ -589,13 +620,25 @@ function FriendChallengeGameContent() {
             console.log('Polling for opponent completion...')
             const { data: updatedAnswers, error: pollError } = await supabase
               .from('friend_challenge_answers')
-              .select('user_id')
+              .select('user_id, question_id')
               .eq('lobby_id', lobbyId)
 
             if (pollError) throw pollError
 
-            const updatedMyCount = updatedAnswers.filter(a => a.user_id === currentUserId).length
-            const updatedOpponentCount = updatedAnswers.filter(a => a.user_id === opponentData?.id).length
+            // Count unique question IDs answered by each player
+            const updatedMyQuestionIds = new Set(
+              updatedAnswers
+                .filter(a => a.user_id === currentUserId)
+                .map(a => a.question_id)
+            )
+            const updatedOpponentQuestionIds = new Set(
+              updatedAnswers
+                .filter(a => a.user_id === opponentData?.id)
+                .map(a => a.question_id)
+            )
+
+            const updatedMyCount = updatedMyQuestionIds.size
+            const updatedOpponentCount = updatedOpponentQuestionIds.size
             
             console.log(`Polling - Me: ${updatedMyCount}, Opponent: ${updatedOpponentCount}`)
 
@@ -609,6 +652,8 @@ function FriendChallengeGameContent() {
             console.error('Error polling for opponent completion:', err)
             clearInterval(pollIntervalRef.current)
             pollIntervalRef.current = null
+            // Show results anyway on error to prevent infinite waiting
+            finishGame()
           }
         }, 2000) // Poll every 2 seconds
 
@@ -780,7 +825,18 @@ function FriendChallengeGameContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-16 w-16 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
-                <User size={32} className="text-amber-600" />
+                {currentUserProfileImage ? (
+                  <Image 
+                    src={currentUserProfileImage} 
+                    alt="Your profile" 
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
+                ) : (
+                  <User size={32} className="text-amber-600" />
+                )}
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">You</h3>
@@ -806,10 +862,13 @@ function FriendChallengeGameContent() {
               </div>
               <div className="h-16 w-16 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
                 {opponentData?.profileImage ? (
-                  <img 
+                  <Image 
                     src={opponentData.profileImage} 
                     alt="Opponent" 
+                    width={64}
+                    height={64}
                     className="h-full w-full object-cover"
+                    onError={(e) => e.target.style.display = 'none'}
                   />
                 ) : (
                   <User size={32} className="text-amber-600" />
