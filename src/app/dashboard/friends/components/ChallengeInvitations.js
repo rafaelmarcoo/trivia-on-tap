@@ -43,13 +43,52 @@ export default function ChallengeInvitations({ onChallengeAccepted }) {
       if (userError) throw userError
       if (!user) throw new Error('User not authenticated')
 
-      // Get pending challenges using the database function
-      const { data, error } = await supabase.rpc('get_pending_friend_challenges', {
-        user_uuid: user.id
-      })
+      console.log('Loading challenges for user:', user.id)
 
-      if (error) throw error
-      setChallenges(data || [])
+      // Get pending challenges with manual join to avoid foreign key issues
+      const { data: lobbies, error: lobbiesError } = await supabase
+        .from('game_lobbies')
+        .select('*')
+        .eq('invited_friend_id', user.id)
+        .eq('lobby_type', 'friend_challenge')
+        .eq('status', 'waiting')
+        .order('created_at', { ascending: false })
+
+      if (lobbiesError) {
+        console.error('Error loading lobbies:', lobbiesError)
+        throw lobbiesError
+      }
+
+      console.log('Raw lobbies data:', lobbies)
+
+      // Get challenger details separately for each lobby
+      const challengesWithUserData = await Promise.all(
+        (lobbies || []).map(async (lobby) => {
+          const { data: challenger, error: challengerError } = await supabase
+            .from('user')
+            .select('user_name, user_level, profile_image')
+            .eq('auth_id', lobby.host_id)
+            .single()
+
+          if (challengerError) {
+            console.warn('Could not load challenger data for lobby:', lobby.id, challengerError)
+          }
+
+          return {
+            lobby_id: lobby.id,
+            challenger_id: lobby.host_id,
+            challenger_username: challenger?.user_name || 'Unknown User',
+            challenger_level: challenger?.user_level || 1,
+            challenger_profile_image: challenger?.profile_image || null,
+            categories: lobby.categories,
+            difficulty: lobby.difficulty,
+            created_at: lobby.created_at
+          }
+        })
+      )
+
+      console.log('Transformed challenges:', challengesWithUserData)
+      setChallenges(challengesWithUserData)
     } catch (err) {
       console.error('Error loading challenges:', err)
       setError(err.message)

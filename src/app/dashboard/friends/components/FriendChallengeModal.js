@@ -49,6 +49,13 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
       if (userError) throw userError
       if (!user) throw new Error('User not authenticated')
 
+      console.log('Sending challenge from:', user.id, 'to:', friend.friend_id)
+      console.log('Challenge details:', {
+        categories: selectedCategories,
+        difficulty: difficulty,
+        friend: friend
+      })
+
       // Create a new game lobby for the challenge
       const { data: lobbyData, error: lobbyError } = await supabase
         .from('game_lobbies')
@@ -57,7 +64,7 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
           status: 'waiting',
           max_players: 2,
           current_players: 1,
-          invited_friend_id: friend.id,
+          invited_friend_id: friend.friend_id,
           categories: selectedCategories,
           difficulty: difficulty,
           lobby_type: 'friend_challenge'
@@ -65,7 +72,12 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
         .select()
         .single()
 
-      if (lobbyError) throw lobbyError
+      if (lobbyError) {
+        console.error('Error creating lobby:', lobbyError)
+        throw lobbyError
+      }
+
+      console.log('Lobby created successfully:', lobbyData)
 
       // Add host to lobby players
       const { error: joinError } = await supabase
@@ -75,10 +87,12 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
           user_id: user.id
         })
 
-      if (joinError) throw joinError
+      if (joinError) {
+        console.error('Error joining lobby:', joinError)
+        throw joinError
+      }
 
-      // Create notification for friend (you might want to implement a notifications system)
-      // For now, we'll just close the modal and show success
+      console.log('Successfully joined lobby as host')
 
       onChallengeSent?.(lobbyData)
       onClose()
@@ -98,7 +112,7 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">
-              Challenge {friend.username}
+              Challenge {friend.friend_username}
             </h2>
             <button
               onClick={onClose}
