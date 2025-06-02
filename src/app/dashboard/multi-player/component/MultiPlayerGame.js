@@ -24,13 +24,14 @@ export default function MultiPlayerGame() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lobbyId = searchParams.get("lobby");
+  const sessionId = searchParams.get("session");
   const userLevel = searchParams.get("level") || 1;
   const supabase = getSupabase();
   const { setGameActive } = useNotifications();
 
   useAutoLogout();
 
-  const [gameState, setGameState] = useState(lobbyId ? "lobby" : "selection");
+  const [gameState, setGameState] = useState("selection");
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -38,10 +39,13 @@ export default function MultiPlayerGame() {
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [gameSummary, setGameSummary] = useState(null);
-  const [gameSessionId, setGameSessionId] = useState(null);
+  const [gameSessionId, setGameSessionId] = useState(sessionId);
   const [lobbyData, setLobbyData] = useState(null);
   const [channel, setChannel] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [preGeneratedQuestions, setPreGeneratedQuestions] = useState(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [gameChannel, setGameChannel] = useState(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -54,7 +58,7 @@ export default function MultiPlayerGame() {
     getCurrentUser();
   }, []);
 
-  // Subscribe to lobby and game changes
+  // Subscribe to lobby changes
   useEffect(() => {
     if (!lobbyId) return;
 
@@ -73,9 +77,40 @@ export default function MultiPlayerGame() {
             const updatedLobby = payload.new;
             setLobbyData(updatedLobby);
 
-            // If lobby status changed to starting, initialize the game
-            if (updatedLobby.status === "starting" && !gameSessionId) {
-              await initializeGame(updatedLobby);
+            // Start game immediately if lobby is in_progress and has game session
+            if (
+              updatedLobby.status === "in_progress" &&
+              updatedLobby.game_session_id
+            ) {
+              try {
+                setIsLoading(true);
+                const { data: dbQuestions, error: fetchError } = await supabase
+                  .from("game_questions")
+                  .select("*")
+                  .eq("game_session_id", updatedLobby.game_session_id)
+                  .order("question_order", { ascending: true });
+
+                if (fetchError) throw fetchError;
+
+                if (dbQuestions && dbQuestions.length > 0) {
+                  const formattedQuestions = dbQuestions.map((q) => ({
+                    id: q.id,
+                    question: q.question_text,
+                    type: q.question_type,
+                    options: q.options,
+                    correctAnswer: q.correct_answer,
+                  }));
+
+                  setQuestions(formattedQuestions);
+                  setGameSessionId(updatedLobby.game_session_id);
+                  setGameState("playing");
+                }
+              } catch (error) {
+                console.error("Error starting game:", error);
+                setError("Failed to start game");
+              } finally {
+                setIsLoading(false);
+              }
             }
           }
         }
@@ -84,8 +119,67 @@ export default function MultiPlayerGame() {
 
     setChannel(channel);
 
-    // Fetch initial lobby data
-    fetchLobbyData();
+    // Check initial lobby state
+    const checkInitialLobbyState = async () => {
+      try {
+        console.log("Checking initial lobby state for lobby:", lobbyId);
+        const { data: lobby, error } = await supabase
+          .from("game_lobbies")
+          .select("*")
+          .eq("id", lobbyId)
+          .single();
+
+        if (error) {
+          console.error("Error fetching lobby:", error);
+          throw error;
+        }
+
+        console.log("Found lobby:", lobby);
+        setLobbyData(lobby);
+
+        if (lobby && lobby.status === "in_progress" && lobby.game_session_id) {
+          console.log(
+            "Lobby is in progress, fetching questions for session:",
+            lobby.game_session_id
+          );
+          const { data: dbQuestions, error: fetchError } = await supabase
+            .from("game_questions")
+            .select("*")
+            .eq("game_session_id", lobby.game_session_id)
+            .order("question_order", { ascending: true });
+
+          if (fetchError) {
+            console.error("Error fetching questions:", fetchError);
+            throw fetchError;
+          }
+
+          if (dbQuestions && dbQuestions.length > 0) {
+            console.log("Found questions:", dbQuestions.length);
+            const formattedQuestions = dbQuestions.map((q) => ({
+              id: q.id,
+              question: q.question_text,
+              type: q.question_type,
+              options: q.options,
+              correctAnswer: q.correct_answer,
+            }));
+
+            setQuestions(formattedQuestions);
+            setGameSessionId(lobby.game_session_id);
+            setGameState("playing");
+          } else {
+            console.log("No questions found for session");
+          }
+        } else {
+          console.log("Lobby not in progress or no game session");
+        }
+      } catch (error) {
+        console.error("Error checking initial lobby state:", error);
+        setError("Failed to check game status");
+        // Don't rethrow the error, just log it and set the error state
+      }
+    };
+
+    checkInitialLobbyState();
 
     return () => {
       if (channel) {
@@ -138,11 +232,18 @@ export default function MultiPlayerGame() {
       if (sessionError) throw sessionError;
       setGameSessionId(sessionData.id);
 
-      // Generate questions
-      const generatedQuestions = await generateTriviaQuestions(
-        categories.map((category) => category.id),
-        userLevel
-      );
+      // Use pre-generated questions if available, otherwise generate new ones
+      const generatedQuestions =
+        preGeneratedQuestions ||
+        (await generateTriviaQuestions(
+          categories.map((category) => category.id),
+          userLevel
+        ));
+
+      // Clear pre-generated questions after using them
+      if (preGeneratedQuestions) {
+        setPreGeneratedQuestions(null);
+      }
 
       // Insert questions into database
       const { error: insertError } = await supabase
@@ -211,8 +312,19 @@ export default function MultiPlayerGame() {
           user_answer: userAnswer,
           is_correct: isCorrect,
           time_taken: 30 - timeLeft,
+          answered_at: new Date().toISOString(),
         })
         .eq("id", currentQuestion.id);
+
+      // Update player's score in game_lobby_players
+      await supabase
+        .from("game_lobby_players")
+        .update({
+          score: score + (isCorrect ? 1 : 0),
+          last_answer_at: new Date().toISOString(),
+        })
+        .eq("lobby_id", lobbyId)
+        .eq("user_id", currentUserId);
 
       handleNextQuestion();
     } catch (error) {
@@ -221,14 +333,32 @@ export default function MultiPlayerGame() {
     }
   };
 
-  const handleNextQuestion = useCallback(() => {
+  const handleNextQuestion = useCallback(async () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setTimeLeft(30);
+      const nextIndex = currentQuestionIndex + 1;
+
+      try {
+        // Update the game session with the new question index
+        const { error: updateError } = await supabase
+          .from("game_sessions")
+          .update({
+            current_question_index: nextIndex,
+            last_updated: new Date().toISOString(),
+          })
+          .eq("id", gameSessionId);
+
+        if (updateError) throw updateError;
+
+        setCurrentQuestionIndex(nextIndex);
+        setTimeLeft(30);
+      } catch (error) {
+        console.error("Error updating question index:", error);
+        setError("Failed to sync game state: " + error.message);
+      }
     } else {
       endGame();
     }
-  }, [currentQuestionIndex, questions.length]);
+  }, [currentQuestionIndex, questions.length, gameSessionId]);
 
   const endGame = async () => {
     try {
@@ -262,147 +392,243 @@ export default function MultiPlayerGame() {
     }
   };
 
-  // Timer effect
+  // Subscribe to game state changes
+  useEffect(() => {
+    if (!gameSessionId) return;
+
+    const channel = supabase
+      .channel(`game_session:${gameSessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_sessions",
+          filter: `id=eq.${gameSessionId}`,
+        },
+        async (payload) => {
+          if (payload.new && payload.new.current_question_index !== undefined) {
+            setCurrentQuestionIndex(payload.new.current_question_index);
+          }
+        }
+      )
+      .subscribe();
+
+    setGameChannel(channel);
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [gameSessionId]);
+
+  // Add effect to sync with current question index and questions from database
+  useEffect(() => {
+    if (!gameSessionId) return;
+
+    const syncGameState = async () => {
+      try {
+        console.log("Syncing game state for session:", gameSessionId);
+
+        // Get session data including current question index
+        const { data: session, error: sessionError } = await supabase
+          .from("game_sessions")
+          .select("current_question_index")
+          .eq("id", gameSessionId)
+          .single();
+
+        if (sessionError) throw sessionError;
+
+        // Get all questions for this session
+        const { data: dbQuestions, error: questionsError } = await supabase
+          .from("game_questions")
+          .select("*")
+          .eq("game_session_id", gameSessionId)
+          .order("question_order", { ascending: true });
+
+        if (questionsError) throw questionsError;
+
+        if (!dbQuestions || dbQuestions.length === 0) {
+          throw new Error("No questions found for game session");
+        }
+
+        console.log("Found questions:", dbQuestions.length);
+
+        // Format questions consistently
+        const formattedQuestions = dbQuestions.map((q) => ({
+          id: q.id,
+          question: q.question_text,
+          type: q.question_type,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+        }));
+
+        // Update local state
+        setQuestions(formattedQuestions);
+        if (session?.current_question_index !== undefined) {
+          setCurrentQuestionIndex(session.current_question_index);
+        }
+      } catch (error) {
+        console.error("Error syncing game state:", error);
+        setError("Failed to sync game state: " + error.message);
+      }
+    };
+
+    syncGameState();
+  }, [gameSessionId]);
+
+  // Modify timer effect to be more precise
   useEffect(() => {
     let timer;
     if (gameState === "playing" && timeLeft > 0 && !isLoading) {
+      const startTime = Date.now();
+      const initialTimeLeft = timeLeft;
+
       timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      handleNextQuestion();
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const newTimeLeft = Math.max(0, initialTimeLeft - elapsed);
+
+        setTimeLeft(newTimeLeft);
+
+        if (newTimeLeft === 0) {
+          handleNextQuestion();
+        }
+      }, 100); // Update more frequently for smoother countdown
     }
+
     return () => clearInterval(timer);
   }, [gameState, timeLeft, isLoading, handleNextQuestion]);
 
+  // Matchmaking effect
+  useEffect(() => {
+    const matchmake = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Get current user
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error("Not authenticated");
+
+        // Try to find a lobby with 1 player and status 'waiting'
+        const { data: lobbies, error: findError } = await supabase
+          .from("game_lobbies")
+          .select("*")
+          .eq("status", "waiting")
+          .eq("current_players", 1)
+          .limit(1);
+
+        if (findError) throw findError;
+
+        if (lobbies && lobbies.length > 0) {
+          // Join the existing lobby
+          const existingLobby = lobbies[0];
+          await supabase.from("game_lobby_players").insert({
+            lobby_id: existingLobby.id,
+            user_id: user.id,
+          });
+          // Update lobby to 2 players and set status to 'starting'
+          await supabase
+            .from("game_lobbies")
+            .update({ current_players: 2, status: "starting" })
+            .eq("id", existingLobby.id);
+
+          // Update URL with lobby ID
+          router.push(`/dashboard/multi-player?lobby=${existingLobby.id}`);
+        } else {
+          // Create a new lobby
+          const { data: newLobby, error: createError } = await supabase
+            .from("game_lobbies")
+            .insert({
+              host_id: user.id,
+              status: "waiting",
+              max_players: 2,
+              current_players: 1,
+            })
+            .select()
+            .single();
+          if (createError) throw createError;
+
+          await supabase.from("game_lobby_players").insert({
+            lobby_id: newLobby.id,
+            user_id: user.id,
+          });
+
+          // Update URL with lobby ID
+          router.push(`/dashboard/multi-player?lobby=${newLobby.id}`);
+        }
+      } catch (error) {
+        setError(error.message || "Matchmaking failed");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Only matchmake if not already in a lobby
+    if (!lobbyId) {
+      matchmake();
+    }
+  }, [lobbyId]);
+
+  // Notification effect
   useEffect(() => {
     // Activate notifications when game starts playing
-    if (gameState === 'playing') {
-      setGameActive(true)
+    if (gameState === "playing") {
+      setGameActive(true);
     } else {
-      setGameActive(false)
+      setGameActive(false);
     }
 
     // Cleanup when component unmounts
     return () => {
-      setGameActive(false)
+      setGameActive(false);
+    };
+  }, [gameState, setGameActive]);
+
+  // Listen for lobby status change to start game automatically
+  useEffect(() => {
+    if (
+      lobbyData &&
+      (lobbyData.status === "starting" || lobbyData.status === "in_progress") &&
+      gameState !== "playing"
+    ) {
+      const fetchQuestionsAndStart = async () => {
+        try {
+          setIsLoading(true);
+          const { data: dbQuestions, error: fetchError } = await supabase
+            .from("game_questions")
+            .select("*")
+            .eq("game_session_id", lobbyData.game_session_id)
+            .order("question_order", { ascending: true });
+
+          if (fetchError) throw fetchError;
+
+          const formattedQuestions = dbQuestions.map((q) => ({
+            id: q.id,
+            question: q.question_text,
+            type: q.question_type,
+            options: q.options,
+            correctAnswer: q.correct_answer,
+          }));
+
+          setQuestions(formattedQuestions);
+          setGameState("playing");
+        } catch (error) {
+          setError("Failed to start game");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchQuestionsAndStart();
     }
-  }, [gameState, setGameActive])
+  }, [lobbyData?.status]);
 
   if (gameState === "selection") {
     return <LobbySystem />;
-  }
-
-  if (gameState === "lobby") {
-    return (
-      <div className="min-h-screen bg-[var(--color-primary)] p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
-              Game Lobby
-            </h1>
-            <button
-              onClick={async () => {
-                try {
-                  // Remove player from lobby
-                  const {
-                    data: { user },
-                  } = await supabase.auth.getUser();
-                  if (user) {
-                    await supabase
-                      .from("game_lobby_players")
-                      .delete()
-                      .eq("lobby_id", lobbyId)
-                      .eq("user_id", user.id);
-
-                    // Update player count
-                    await supabase
-                      .from("game_lobbies")
-                      .update({
-                        current_players: lobbyData.current_players - 1,
-                        status:
-                          lobbyData.current_players <= 1
-                            ? "completed"
-                            : "waiting",
-                      })
-                      .eq("id", lobbyId);
-                  }
-                  router.push("/dashboard/multi-player");
-                } catch (error) {
-                  console.error("Error leaving lobby:", error);
-                  setError("Failed to leave lobby");
-                }
-              }}
-              className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
-            >
-              Leave Lobby
-            </button>
-          </div>
-
-          {error && (
-            <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
-
-          {lobbyData && (
-            <div className="bg-[var(--color-secondary)] p-6 rounded-lg">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-white mb-4">
-                  Players in Lobby
-                </h2>
-                <div className="space-y-2">
-                  {lobbyData.current_players === 0 ? (
-                    <p className="text-gray-300">No players yet</p>
-                  ) : (
-                    <p className="text-white">
-                      Players: {lobbyData.current_players}/
-                      {lobbyData.max_players}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {currentUserId === lobbyData.host_id && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={async () => {
-                      try {
-                        setError(null);
-                        // Check if there are enough players
-                        if (lobbyData.current_players < 1) {
-                          throw new Error("Need at least 1 player to start");
-                        }
-
-                        // Update lobby status to starting
-                        const { error: updateError } = await supabase
-                          .from("game_lobbies")
-                          .update({ status: "starting" })
-                          .eq("id", lobbyId);
-
-                        if (updateError) throw updateError;
-
-                        // Initialize the game
-                        await initializeGame(lobbyData);
-                      } catch (error) {
-                        console.error("Error starting game:", error);
-                        setError(error.message || "Failed to start game");
-                      }
-                    }}
-                    disabled={lobbyData.current_players < 1}
-                    className="bg-[var(--color-fourth)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-                  >
-                    {lobbyData.current_players < 1
-                      ? "Waiting for Players..."
-                      : "Start Game"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
   }
 
   if (gameState === "playing") {
@@ -419,15 +645,24 @@ export default function MultiPlayerGame() {
               Loading...
             </div>
           </div>
-        ) : (
+        ) : currentQuestion ? (
           <QuestionDisplay
-            question={currentQuestion}
-            timeLeft={timeLeft}
+            type={currentQuestion.type}
+            question={currentQuestion.question}
+            options={currentQuestion.options}
+            correctAnswer={currentQuestion.correctAnswer}
             onAnswer={handleAnswer}
+            onNextQuestion={handleNextQuestion}
             questionNumber={currentQuestionIndex + 1}
             totalQuestions={questions.length}
             score={score}
+            timeLeft={timeLeft}
+            isLastQuestion={currentQuestionIndex === questions.length - 1}
           />
+        ) : (
+          <div className="text-center text-[var(--color-fourth)] text-xl">
+            No questions available
+          </div>
         )}
       </div>
     );
@@ -442,5 +677,11 @@ export default function MultiPlayerGame() {
     );
   }
 
-  return null;
+  return (
+    <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+      <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+        Loading game...
+      </div>
+    </div>
+  );
 }

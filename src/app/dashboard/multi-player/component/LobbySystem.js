@@ -1,245 +1,247 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/utils/supabase";
+import { generateTriviaQuestions } from "@/utils/openai";
 
-export default function LobbySystem({ onGameStart }) {
-  const [lobbies, setLobbies] = useState([]);
-  const [isCreatingLobby, setIsCreatingLobby] = useState(false);
+// Available quiz categories
+const categories = [
+  { id: "general", name: "General" },
+  { id: "history", name: "History" },
+  { id: "technology", name: "Technology" },
+  { id: "geography", name: "Geography" },
+  { id: "science", name: "Science" },
+  { id: "math", name: "Math" },
+];
+
+export default function LobbySystem() {
   const [error, setError] = useState(null);
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [waitingPlayers, setWaitingPlayers] = useState([]);
   const supabase = getSupabase();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const userLevel = searchParams.get("level") || 1;
+  const [matchFound, setMatchFound] = useState(false);
+  const [matchData, setMatchData] = useState(null);
 
-  // Subscribe to lobby changes
+  // Subscribe to waiting_players table in realtime
   useEffect(() => {
-    const channel = supabase
-      .channel("lobby_changes")
+    let channel;
+    const fetchWaitingPlayers = async () => {
+      const { data, error } = await supabase
+        .from("waiting_players")
+        .select("*");
+      if (!error) setWaitingPlayers(data || []);
+    };
+
+    fetchWaitingPlayers();
+
+    channel = supabase
+      .channel("public:waiting_players")
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "game_lobbies",
-          filter: "status=eq.waiting",
-        },
+        { event: "*", schema: "public", table: "waiting_players" },
         (payload) => {
-          if (payload.eventType === "INSERT") {
-            setLobbies((prev) => [...prev, payload.new]);
-          } else if (payload.eventType === "UPDATE") {
-            setLobbies((prev) =>
-              prev.map((lobby) =>
-                lobby.id === payload.new.id ? payload.new : lobby
-              )
-            );
-          } else if (payload.eventType === "DELETE") {
-            setLobbies((prev) =>
-              prev.filter((lobby) => lobby.id !== payload.old.id)
-            );
-          }
+          fetchWaitingPlayers();
         }
       )
       .subscribe();
 
-    // Fetch initial lobbies
-    fetchLobbies();
-
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchLobbies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("game_lobbies")
-        .select("*")
-        .eq("status", "waiting")
-        .order("created_at", { ascending: false });
+  useEffect(() => {
+    let isMounted = true;
+    let intervalId;
 
-      if (error) throw error;
-      setLobbies(data);
-    } catch (error) {
-      console.error("Error fetching lobbies:", error);
-      setError("Failed to fetch lobbies");
-    }
-  };
-
-  const createLobby = async () => {
-    try {
-      setIsCreatingLobby(true);
+    const matchmake = async () => {
+      setIsLoading(true);
       setError(null);
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error("Not authenticated");
+      try {
+        // Get current user
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error("Not authenticated");
 
-      // Create the lobby
-      const { data: lobbyData, error: lobbyError } = await supabase
-        .from("game_lobbies")
-        .insert({
-          host_id: user.id,
-          status: "waiting",
-          max_players: 2,
-          current_players: 1,
-        })
-        .select()
-        .single();
+        // Check if already in waiting_players
+        const { data: alreadyWaiting } = await supabase
+          .from("waiting_players")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
 
-      if (lobbyError) throw lobbyError;
+        if (!alreadyWaiting) {
+          // Add yourself to waiting_players using upsert
+          const { data: insertData, error: insertError } = await supabase
+            .from("waiting_players")
+            .upsert({ user_id: user.id })
+            .select()
+            .single();
 
-      // Join the lobby as host
-      const { error: joinError } = await supabase
-        .from("game_lobby_players")
-        .insert({
-          lobby_id: lobbyData.id,
-          user_id: user.id,
-        });
+          if (insertError) {
+            setError("Failed to join matchmaking: " + insertError.message);
+            console.error("Supabase insert error:", insertError);
+            return;
+          }
+          if (!insertData) {
+            setError(
+              "Insert succeeded but no data returned. Check Supabase policies."
+            );
+            return;
+          }
+          // For debugging: log the inserted row
+          console.log("Inserted into waiting_players:", insertData);
 
-      if (joinError) throw joinError;
+          setIsLoading(false);
+          return; // Wait for next poll to look for a match
+        }
 
-      // Navigate to the lobby
-      router.push(`/dashboard/multi-player?lobby=${lobbyData.id}`);
-    } catch (error) {
-      console.error("Error creating lobby:", error);
-      setError(error.message || "Failed to create lobby");
-    } finally {
-      setIsCreatingLobby(false);
-    }
-  };
+        // Try to find another waiting player (not yourself)
+        const { data: waitingPlayers, error: waitingError } = await supabase
+          .from("waiting_players")
+          .select("*")
+          .neq("user_id", user.id)
+          .limit(1);
 
-  const joinLobby = async (lobbyId) => {
-    try {
-      setError(null);
+        if (waitingError) throw waitingError;
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error("Not authenticated");
+        if (waitingPlayers && waitingPlayers.length > 0) {
+          // Found another waiting player, create a lobby and assign both
+          const otherPlayer = waitingPlayers[0];
 
-      // Check if already in lobby
-      const { data: existingPlayer, error: checkError } = await supabase
-        .from("game_lobby_players")
-        .select("id")
-        .eq("lobby_id", lobbyId)
-        .eq("user_id", user.id)
-        .single();
+          // Remove both players from waiting list
+          await supabase
+            .from("waiting_players")
+            .delete()
+            .in("user_id", [otherPlayer.user_id, user.id]);
 
-      if (checkError && checkError.code !== "PGRST116") {
-        // PGRST116 is "no rows returned"
-        throw checkError;
+          // Create a new game session
+          const { data: newSession, error: sessionError } = await supabase
+            .from("game_sessions")
+            .insert({
+              game_type: "multiplayer",
+              total_questions: 10,
+              user_id: user.id,
+            })
+            .select()
+            .single();
+
+          if (sessionError) throw sessionError;
+
+          // Generate questions using OpenAI
+          const generatedQuestions = await generateTriviaQuestions(
+            categories.map((category) => category.id),
+            userLevel
+          );
+
+          // Insert questions into database
+          const { error: insertQuestionsError } = await supabase
+            .from("game_questions")
+            .insert(
+              generatedQuestions.map((q, index) => ({
+                game_session_id: newSession.id,
+                question_text: q.question,
+                question_type: q.type,
+                options: q.options,
+                correct_answer: q.correctAnswer,
+                question_order: index + 1,
+              }))
+            );
+
+          if (insertQuestionsError) throw insertQuestionsError;
+
+          // Create a new lobby with in_progress status and game session
+          const { data: newLobby, error: createError } = await supabase
+            .from("game_lobbies")
+            .insert({
+              host_id: otherPlayer.user_id,
+              status: "in_progress",
+              max_players: 2,
+              current_players: 2,
+              game_session_id: newSession.id,
+            })
+            .select()
+            .single();
+
+          if (createError) throw createError;
+
+          // Add both players to the lobby
+          await supabase.from("game_lobby_players").insert([
+            { lobby_id: newLobby.id, user_id: otherPlayer.user_id },
+            { lobby_id: newLobby.id, user_id: user.id },
+          ]);
+
+          if (isMounted) {
+            // Instead of redirecting, set match data and flag
+            setMatchData({
+              lobbyId: newLobby.id,
+              sessionId: newSession.id,
+            });
+            setMatchFound(true);
+          }
+        }
+      } catch (error) {
+        setError(error.message || "Matchmaking failed");
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      if (existingPlayer) {
-        // Already in lobby, just navigate
-        router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
-        return;
-      }
+    matchmake();
+    intervalId = setInterval(matchmake, 2000);
 
-      // Check if lobby is full
-      const { data: lobby, error: lobbyError } = await supabase
-        .from("game_lobbies")
-        .select("current_players, max_players, status")
-        .eq("id", lobbyId)
-        .single();
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      if (lobbyError) throw lobbyError;
-      if (lobby.status !== "waiting")
-        throw new Error("Lobby is no longer available");
-      if (lobby.current_players >= lobby.max_players)
-        throw new Error("Lobby is full");
-
-      // Join the lobby
-      const { error: joinError } = await supabase
-        .from("game_lobby_players")
-        .insert({
-          lobby_id: lobbyId,
-          user_id: user.id,
-        });
-
-      if (joinError) throw joinError;
-
-      // Update player count
-      const { error: updateError } = await supabase
-        .from("game_lobbies")
-        .update({ current_players: lobby.current_players + 1 })
-        .eq("id", lobbyId);
-
-      if (updateError) throw updateError;
-
-      // Navigate to the lobby
-      router.push(`/dashboard/multi-player?lobby=${lobbyId}`);
-    } catch (error) {
-      console.error("Error joining lobby:", error);
-      setError(error.message || "Failed to join lobby");
+  // If match is found, update URL and let parent component handle the game
+  useEffect(() => {
+    if (matchFound && matchData) {
+      const url = `/dashboard/multi-player?lobby=${matchData.lobbyId}&session=${matchData.sessionId}`;
+      // Update URL without navigation
+      window.history.pushState({}, "", url);
+      // Force a re-render of the parent component
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
-  };
+  }, [matchFound, matchData]);
 
   return (
-    <div className="min-h-screen bg-[var(--color-primary)] p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
-            Multiplayer Lobby
-          </h1>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="bg-[var(--color-tertiary)] text-white px-4 py-2 rounded-lg hover:bg-opacity-90"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-
+    <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-[var(--color-fourth)] mb-4">
+          Finding a match...
+        </h1>
+        {isLoading && (
+          <div className="animate-pulse text-[var(--color-fourth)] text-xl">
+            Looking for another player...
+          </div>
+        )}
         {error && (
-          <div className="bg-red-500 text-white p-4 rounded-lg mb-4">
+          <div className="bg-red-500 text-white p-4 rounded-lg mt-4">
             {error}
           </div>
         )}
-
-        <div className="flex justify-between items-center mb-8">
-          <button
-            onClick={createLobby}
-            disabled={isCreatingLobby}
-            className="bg-[var(--color-secondary)] text-white px-6 py-3 rounded-lg hover:bg-opacity-90 disabled:opacity-50"
-          >
-            {isCreatingLobby ? "Creating..." : "Create New Lobby"}
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-[var(--color-fourth)]">
-            Available Lobbies
+        {/* Show waiting players for debugging */}
+        <div className="mt-4">
+          <h2 className="text-lg text-[var(--color-fourth)] mb-2">
+            Waiting Players:
           </h2>
-          {lobbies.length === 0 ? (
-            <p className="text-[var(--color-fourth)]">No lobbies available</p>
-          ) : (
-            lobbies.map((lobby) => (
-              <div
-                key={lobby.id}
-                className="bg-[var(--color-secondary)] p-4 rounded-lg flex justify-between items-center"
-              >
-                <div>
-                  <p className="text-white">
-                    Players: {lobby.current_players}/{lobby.max_players}
-                  </p>
-                  <p className="text-gray-300 text-sm">
-                    Created: {new Date(lobby.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => joinLobby(lobby.id)}
-                  className="bg-[var(--color-fourth)] text-white px-4 py-2 rounded hover:bg-opacity-90"
-                >
-                  Join
-                </button>
-              </div>
-            ))
-          )}
+          <ul className="text-white">
+            {waitingPlayers.map((p) => (
+              <li key={p.user_id}>{p.user_id}</li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>
