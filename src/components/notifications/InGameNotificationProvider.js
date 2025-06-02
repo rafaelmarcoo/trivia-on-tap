@@ -135,9 +135,54 @@ export default function InGameNotificationProvider({ children }) {
       )
       .subscribe()
 
+    // Subscribe to friend challenges - shows everywhere
+    const challengesChannel = supabase
+      .channel('friend_challenges_notifications')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'game_lobbies',
+          filter: `invited_friend_id=eq.${currentUserId}`
+        }, 
+        async (payload) => {
+          const newLobby = payload.new
+          
+          // Only notify for friend challenges
+          if (newLobby.lobby_type !== 'friend_challenge') return
+          
+          // Get challenger info
+          const { data: challengerData } = await supabase
+            .from('user')
+            .select('user_name, profile_image')
+            .eq('auth_id', newLobby.host_id)
+            .single()
+
+          const notification = {
+            id: `challenge_${newLobby.id}`,
+            type: 'challenge',
+            title: 'Challenge Invitation',
+            message: `${challengerData?.user_name || 'Someone'} challenged you to a trivia battle!`,
+            data: {
+              lobbyId: newLobby.id,
+              challengerId: newLobby.host_id,
+              challengerName: challengerData?.user_name,
+              categories: newLobby.categories,
+              difficulty: newLobby.difficulty
+            },
+            timestamp: new Date(newLobby.created_at),
+            onClick: () => navigateToChallenges()
+          }
+
+          addNotification(notification)
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(messagesChannel)
       supabase.removeChannel(friendRequestsChannel)
+      supabase.removeChannel(challengesChannel)
     }
   }, [currentUserId, loadUnreadCount])
 
@@ -170,6 +215,12 @@ export default function InGameNotificationProvider({ children }) {
     }
   }, [])
 
+  const navigateToChallenges = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/dashboard/friends#challenges'
+    }
+  }, [])
+
   // Mark game as active/inactive (kept for backward compatibility)
   const setGameActive = useCallback((active) => {
     setIsGameActive(active)
@@ -189,7 +240,8 @@ export default function InGameNotificationProvider({ children }) {
     clearAllNotifications,
     setGameActive,
     navigateToMessages,
-    navigateToFriends
+    navigateToFriends,
+    navigateToChallenges
   }
 
   return (

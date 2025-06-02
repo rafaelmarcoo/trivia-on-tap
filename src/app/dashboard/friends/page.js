@@ -18,6 +18,7 @@ import {
 import { getUnreadMessageCount } from '@/utils/messages'
 import FriendChallengeModal from './components/FriendChallengeModal'
 import { ConversationsList, ChatWindow } from './components/MessagingComponents'
+import ChallengeInvitations from './components/ChallengeInvitations'
 
 function FriendsPageContent() {
   const [activeTab, setActiveTab] = useState('friends')
@@ -29,6 +30,7 @@ function FriendsPageContent() {
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [challengeModal, setChallengeModal] = useState({ isOpen: false, friend: null })
+  const [pendingChallengesCount, setPendingChallengesCount] = useState(0)
   
   // Messaging state
   const [selectedConversation, setSelectedConversation] = useState(null)
@@ -88,6 +90,8 @@ function FriendsPageContent() {
     // Check URL hash to open specific tab
     if (window.location.hash === '#messages') {
       setActiveTab('messages')
+    } else if (window.location.hash === '#challenges') {
+      setActiveTab('challenges')
     }
   }, [router, searchParams])
 
@@ -103,7 +107,59 @@ function FriendsPageContent() {
     } else if (activeTab === 'requests') {
       loadFriendRequests()
     }
+    
+    // Always check for accepted challenges when loading any tab
+    checkAcceptedChallenges()
   }, [activeTab])
+
+  // Check for accepted challenges that need to be started
+  const checkAcceptedChallenges = async () => {
+    try {
+      const { getSupabase } = require('@/utils/supabase')
+      const supabase = getSupabase()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) return
+
+      // Check for challenges where I'm the host and status is 'challenge_accepted'
+      const { data: acceptedChallenges, error } = await supabase
+        .from('game_lobbies')
+        .select('id, invited_friend_id, created_at')
+        .eq('host_id', user.id)
+        .eq('lobby_type', 'friend_challenge')
+        .eq('status', 'challenge_accepted')
+
+      if (error) {
+        console.error('Error checking accepted challenges:', error)
+        return
+      }
+
+      if (acceptedChallenges && acceptedChallenges.length > 0) {
+        console.log('Found accepted challenges:', acceptedChallenges)
+        const challenge = acceptedChallenges[0] // Take the first one
+        
+        setSuccessMessage('Your challenge was accepted! Click to start the game.')
+        
+        // Add a button to start the game
+        setTimeout(() => {
+          if (confirm('Your trivia challenge was accepted! Start the game now?')) {
+            window.location.href = `/dashboard/friends/challenge?lobby=${challenge.id}`
+          }
+        }, 500)
+      }
+    } catch (err) {
+      console.error('Error checking accepted challenges:', err)
+    }
+  }
+
+  // Periodic check for accepted challenges
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkAcceptedChallenges()
+    }, 5000) // Check every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Search users when search term changes
   useEffect(() => {
@@ -279,6 +335,11 @@ function FriendsPageContent() {
     setTimeout(() => setSuccessMessage(''), 3000)
     // Optionally redirect to the lobby
     // router.push(`/dashboard/multi-player?lobby=${lobbyData.id}`)
+  }
+
+  const handleChallengeAccepted = (lobbyId) => {
+    setSuccessMessage('Challenge accepted! Starting game...')
+    setTimeout(() => setSuccessMessage(''), 3000)
   }
 
   // Messaging handlers
@@ -484,6 +545,12 @@ function FriendsPageContent() {
               count={friendRequests.received.length}
             />
             <TabButton 
+              tab="challenges" 
+              icon={Trophy} 
+              label="Challenges" 
+              count={pendingChallengesCount}
+            />
+            <TabButton 
               tab="messages" 
               icon={MessageCircle} 
               label="Messages" 
@@ -494,6 +561,13 @@ function FriendsPageContent() {
 
           {/* Tab Content */}
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Challenges Tab */}
+            {activeTab === 'challenges' && (
+              <div className="p-6">
+                <ChallengeInvitations onChallengeAccepted={handleChallengeAccepted} />
+              </div>
+            )}
+
             {/* Messages Tab */}
             {activeTab === 'messages' && (
               <div className="h-[600px] flex">

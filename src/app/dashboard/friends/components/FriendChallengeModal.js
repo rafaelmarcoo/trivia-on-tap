@@ -11,12 +11,12 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
   const [error, setError] = useState(null)
 
   const categories = [
-    { id: 'general', name: 'General Knowledge' },
+    { id: 'general', name: 'General' },
     { id: 'history', name: 'History' },
     { id: 'technology', name: 'Technology' },
     { id: 'geography', name: 'Geography' },
     { id: 'science', name: 'Science' },
-    { id: 'math', name: 'Mathematics' }
+    { id: 'math', name: 'Math' }
   ]
 
   const difficulties = [
@@ -49,15 +49,22 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
       if (userError) throw userError
       if (!user) throw new Error('User not authenticated')
 
-      // Create a challenge lobby
+      console.log('Sending challenge from:', user.id, 'to:', friend.friend_id)
+      console.log('Challenge details:', {
+        categories: selectedCategories,
+        difficulty: difficulty,
+        friend: friend
+      })
+
+      // Create a new game lobby for the challenge
       const { data: lobbyData, error: lobbyError } = await supabase
         .from('game_lobbies')
         .insert({
           host_id: user.id,
-          invited_friend_id: friend.friend_id,
           status: 'waiting',
           max_players: 2,
           current_players: 1,
+          invited_friend_id: friend.friend_id,
           categories: selectedCategories,
           difficulty: difficulty,
           lobby_type: 'friend_challenge'
@@ -65,7 +72,12 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
         .select()
         .single()
 
-      if (lobbyError) throw lobbyError
+      if (lobbyError) {
+        console.error('Error creating lobby:', lobbyError)
+        throw lobbyError
+      }
+
+      console.log('Lobby created successfully:', lobbyData)
 
       // Add host to lobby players
       const { error: joinError } = await supabase
@@ -75,10 +87,12 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
           user_id: user.id
         })
 
-      if (joinError) throw joinError
+      if (joinError) {
+        console.error('Error joining lobby:', joinError)
+        throw joinError
+      }
 
-      // Create notification for friend (you might want to implement a notifications system)
-      // For now, we'll just close the modal and show success
+      console.log('Successfully joined lobby as host')
 
       onChallengeSent?.(lobbyData)
       onClose()
@@ -94,107 +108,96 @@ export default function FriendChallengeModal({ isOpen, onClose, friend, onChalle
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-amber-900">Challenge Friend</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Friend Info */}
-          <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
-            <div className="h-12 w-12 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
-              {friend.friend_profile_image ? (
-                <img 
-                  src={friend.friend_profile_image} 
-                  alt="Profile" 
-                  className="h-full w-full object-cover"
-                  onError={(e) => e.target.style.display = 'none'}
-                />
-              ) : (
-                <User size={24} className="text-amber-600" />
-              )}
-            </div>
-            <div>
-              <h3 className="font-semibold text-amber-900">{friend.friend_username}</h3>
-              <p className="text-sm text-amber-600">
-                <Star className="inline w-4 h-4 mr-1" />
-                Level {friend.friend_level}
-              </p>
-            </div>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900">
+              Challenge {friend.friend_username}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
           </div>
 
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
             </div>
           )}
 
-          {/* Categories Selection */}
-          <div>
-            <h3 className="font-semibold text-amber-900 mb-3">Select Categories</h3>
+          {/* Challenge Details */}
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <h3 className="font-semibold text-amber-800 mb-2">Challenge Format</h3>
+            <ul className="text-sm text-amber-700 space-y-1">
+              <li>• 10 trivia questions</li>
+              <li>• Both players answer the same questions</li>
+              <li>• 30 seconds per question</li>
+              <li>• Highest score wins!</li>
+            </ul>
+          </div>
+
+          {/* Category Selection */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900">Categories</h3>
             <div className="grid grid-cols-2 gap-2">
               {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => toggleCategory(category.id)}
-                  className={`p-3 rounded-lg border transition-all duration-200 text-sm ${
-                    selectedCategories.includes(category.id)
-                      ? 'bg-amber-500 text-white border-amber-500'
-                      : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
-                  }`}
-                >
-                  {category.name}
-                </button>
+                <label key={category.id} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category.id)}
+                    onChange={() => toggleCategory(category.id)}
+                    className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {category.name}
+                  </span>
+                </label>
               ))}
             </div>
-            <p className="text-xs text-amber-600 mt-2">
-              Select at least one category for the challenge
-            </p>
+            {selectedCategories.length === 0 && (
+              <p className="text-sm text-red-600 mt-2">Please select at least one category</p>
+            )}
           </div>
 
           {/* Difficulty Selection */}
-          <div>
-            <h3 className="font-semibold text-amber-900 mb-3">Difficulty Level</h3>
-            <div className="space-y-2">
-              {difficulties.map((diff) => (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900">Difficulty</h3>
+            <div className="flex gap-2">
+              {['easy', 'medium', 'hard'].map((level) => (
                 <button
-                  key={diff.id}
-                  onClick={() => setDifficulty(diff.id)}
-                  className={`w-full p-3 rounded-lg border transition-all duration-200 text-left ${
-                    difficulty === diff.id
-                      ? 'bg-amber-500 text-white border-amber-500'
-                      : 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50'
+                  key={level}
+                  onClick={() => setDifficulty(level)}
+                  className={`px-4 py-2 rounded-lg capitalize transition-colors ${
+                    difficulty === level
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  <div className="font-medium">{diff.name}</div>
-                  <div className="text-sm opacity-80">{diff.description}</div>
+                  {level}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Challenge Button */}
-          <button
-            onClick={sendChallenge}
-            disabled={isLoading || selectedCategories.length === 0}
-            className="w-full bg-amber-500 text-white py-3 rounded-lg hover:bg-amber-600 transition-colors duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <Trophy size={20} />
-            )}
-            {isLoading ? 'Sending Challenge...' : 'Send Challenge'}
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={sendChallenge}
+              disabled={selectedCategories.length === 0 || isLoading}
+              className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Sending...' : 'Send Challenge'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
