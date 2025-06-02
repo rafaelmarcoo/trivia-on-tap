@@ -105,7 +105,59 @@ function FriendsPageContent() {
     } else if (activeTab === 'requests') {
       loadFriendRequests()
     }
+    
+    // Always check for accepted challenges when loading any tab
+    checkAcceptedChallenges()
   }, [activeTab])
+
+  // Check for accepted challenges that need to be started
+  const checkAcceptedChallenges = async () => {
+    try {
+      const { getSupabase } = require('@/utils/supabase')
+      const supabase = getSupabase()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) return
+
+      // Check for challenges where I'm the host and status is 'challenge_accepted'
+      const { data: acceptedChallenges, error } = await supabase
+        .from('game_lobbies')
+        .select('id, invited_friend_id, created_at')
+        .eq('host_id', user.id)
+        .eq('lobby_type', 'friend_challenge')
+        .eq('status', 'challenge_accepted')
+
+      if (error) {
+        console.error('Error checking accepted challenges:', error)
+        return
+      }
+
+      if (acceptedChallenges && acceptedChallenges.length > 0) {
+        console.log('Found accepted challenges:', acceptedChallenges)
+        const challenge = acceptedChallenges[0] // Take the first one
+        
+        setSuccessMessage('Your challenge was accepted! Click to start the game.')
+        
+        // Add a button to start the game
+        setTimeout(() => {
+          if (confirm('Your trivia challenge was accepted! Start the game now?')) {
+            window.location.href = `/dashboard/friends/challenge?lobby=${challenge.id}`
+          }
+        }, 500)
+      }
+    } catch (err) {
+      console.error('Error checking accepted challenges:', err)
+    }
+  }
+
+  // Periodic check for accepted challenges
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkAcceptedChallenges()
+    }, 5000) // Check every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Search users when search term changes
   useEffect(() => {

@@ -47,6 +47,7 @@ function FriendChallengeGameContent() {
           return
         }
 
+        console.log('Initializing challenge for user:', user.id)
         setCurrentUserId(user.id)
         await loadLobbyData(user.id)
       } catch (err) {
@@ -70,9 +71,18 @@ function FriendChallengeGameContent() {
         table: 'friend_challenge_answers',
         filter: `lobby_id=eq.${lobbyId}`
       }, (payload) => {
+        console.log('Challenge answer update:', payload)
         // Reload opponent answers when they answer
         if (payload.new && payload.new.user_id !== currentUserId) {
-          loadOpponentAnswers()
+          // Get opponent ID from lobby data
+          if (lobbyData) {
+            const opponentId = lobbyData.host_id === currentUserId 
+              ? lobbyData.invited_friend_id 
+              : lobbyData.host_id
+            loadOpponentAnswers(opponentId)
+          } else if (opponentData?.id) {
+            loadOpponentAnswers(opponentData.id)
+          }
         }
       })
       .on('postgres_changes', {
@@ -81,9 +91,14 @@ function FriendChallengeGameContent() {
         table: 'game_lobbies',
         filter: `id=eq.${lobbyId}`
       }, (payload) => {
+        console.log('Lobby status update:', payload)
         // Handle lobby status changes
-        if (payload.new.status === 'in_progress' && gameState === 'waiting') {
-          initializeGame()
+        if (payload.new.status === 'challenge_accepted' && gameState === 'loading') {
+          console.log('Challenge was accepted, starting game...')
+          loadLobbyData(currentUserId) // Reload lobby data and start game
+        } else if (payload.new.status === 'in_progress' && gameState === 'waiting') {
+          console.log('Game started by host, initializing...')
+          initializeGame(currentUserId, opponentData?.id)
         }
       })
       .subscribe()
@@ -91,7 +106,7 @@ function FriendChallengeGameContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [lobbyId, currentUserId, gameState])
+  }, [lobbyId, currentUserId, gameState, lobbyData, opponentData])
 
   // Timer for questions
   useEffect(() => {
@@ -119,23 +134,31 @@ function FriendChallengeGameContent() {
       if (error) throw error
       if (!lobby) throw new Error('Lobby not found')
 
+      console.log('Loaded lobby data:', lobby)
       setLobbyData(lobby)
 
       // Get opponent data
       const opponentId = lobby.host_id === userId ? lobby.invited_friend_id : lobby.host_id
+      console.log('Loading opponent data for:', opponentId)
+      
       const { data: opponentUser, error: opponentError } = await supabase
         .from('user')
         .select('user_name, user_level, profile_image')
         .eq('auth_id', opponentId)
         .single()
 
-      if (opponentError) throw opponentError
-      setOpponentData({
+      const opponentInfo = {
         id: opponentId,
-        username: opponentUser.user_name,
-        level: opponentUser.user_level,
-        profileImage: opponentUser.profile_image
-      })
+        username: opponentUser?.user_name || 'Unknown User',
+        level: opponentUser?.user_level || 1,
+        profileImage: opponentUser?.profile_image || null
+      }
+
+      if (opponentError) {
+        console.warn('Could not load opponent data:', opponentError)
+      }
+      
+      setOpponentData(opponentInfo)
 
       // Check if both players are ready
       const { data: players, error: playersError } = await supabase
@@ -143,12 +166,40 @@ function FriendChallengeGameContent() {
         .select('user_id')
         .eq('lobby_id', lobbyId)
 
-      if (playersError) throw playersError
+      if (playersError) {
+        console.warn('Could not load players:', playersError)
+        // Continue based on lobby status
+      }
 
-      if (players.length === 2 && lobby.status === 'challenge_accepted') {
-        // Start the game automatically if both players are present
-        await startGame()
+      console.log('Lobby status:', lobby.status)
+      console.log('Players in lobby:', players?.length || 0)
+      console.log('Am I the host?', lobby.host_id === userId)
+      console.log('Current userId:', userId)
+      console.log('State currentUserId:', currentUserId)
+
+      if (lobby.status === 'in_progress') {
+        // Game already started, initialize it
+        console.log('Game already in progress, initializing...')
+        await initializeGame(userId, opponentId)
+      } else if (lobby.status === 'challenge_accepted') {
+        // Challenge was accepted, start the game
+        if (lobby.host_id === userId) {
+          console.log('I am the host and challenge was accepted, starting game...')
+          // Make sure currentUserId is set before starting game
+          if (!currentUserId) {
+            console.log('Setting currentUserId before starting game...')
+            setCurrentUserId(userId)
+          }
+          await startGame(lobby, userId)
+        } else {
+          console.log('I am not the host, waiting for host to start game...')
+          setGameState('waiting')
+        }
+      } else if (lobby.status === 'waiting') {
+        console.log('Challenge not yet accepted, waiting...')
+        setGameState('waiting')
       } else {
+        console.log('Unknown lobby status:', lobby.status)
         setGameState('waiting')
       }
     } catch (err) {
@@ -157,19 +208,34 @@ function FriendChallengeGameContent() {
     }
   }
 
-  const startGame = async () => {
+  const startGame = async (passedLobbyData = null, userId) => {
     try {
       setIsLoading(true)
       setError(null)
 
+      // Use passed lobby data or state lobby data
+      const lobby = passedLobbyData || lobbyData
+      if (!lobby) {
+        throw new Error('No lobby data available')
+      }
+
+      console.log('Starting game with lobby:', lobby)
+      console.log('Current user ID:', userId)
+      console.log('Lobby host ID:', lobby.host_id)
+      console.log('Host check result:', lobby.host_id === userId)
+
       // Only the host generates and stores questions
-      if (lobbyData.host_id === currentUserId) {
+      if (lobby.host_id === userId) {
+        console.log('I am the host, generating questions...')
+        
         // Generate questions - using the selected categories and difficulty from challenge
         const generatedQuestions = await generateTriviaQuestions(
-          lobbyData.categories || ['general'],
-          lobbyData.difficulty || 'medium',
+          lobby.categories || ['general'],
+          lobby.difficulty || 'medium',
           totalQuestions
         )
+
+        console.log('Generated questions:', generatedQuestions.length)
 
         // Create a game session for this challenge
         const { data: sessionData, error: sessionError } = await supabase
@@ -178,14 +244,16 @@ function FriendChallengeGameContent() {
             game_type: 'friend_challenge',
             lobby_id: lobbyId,
             total_questions: totalQuestions,
-            categories: lobbyData.categories,
-            difficulty_level: lobbyData.difficulty === 'easy' ? 1 : lobbyData.difficulty === 'hard' ? 3 : 2,
+            categories: lobby.categories,
+            difficulty_level: lobby.difficulty === 'easy' ? 1 : lobby.difficulty === 'hard' ? 3 : 2,
             time_per_question: 30
           })
           .select()
           .single()
 
         if (sessionError) throw sessionError
+
+        console.log('Created game session:', sessionData.id)
 
         // Insert questions
         const { error: questionsError } = await supabase
@@ -204,6 +272,8 @@ function FriendChallengeGameContent() {
 
         if (questionsError) throw questionsError
 
+        console.log('Inserted questions successfully')
+
         // Update lobby status
         await supabase
           .from('game_lobbies')
@@ -212,9 +282,17 @@ function FriendChallengeGameContent() {
             game_session_id: sessionData.id
           })
           .eq('id', lobbyId)
+
+        console.log('Updated lobby to in_progress')
+      } else {
+        console.log('I am not the host, waiting for game setup...')
+        console.log('Expected host ID:', lobby.host_id)
+        console.log('My user ID:', userId)
       }
 
-      await initializeGame()
+      // Get opponent ID for initialization
+      const opponentId = lobby.host_id === userId ? lobby.invited_friend_id : lobby.host_id
+      await initializeGame(userId, opponentId)
     } catch (err) {
       console.error('Error starting game:', err)
       setError(err.message)
@@ -223,8 +301,14 @@ function FriendChallengeGameContent() {
     }
   }
 
-  const initializeGame = async () => {
+  const initializeGame = async (userId = null, opponentId = null) => {
     try {
+      // Use passed parameters or fall back to state
+      const myUserId = userId || currentUserId
+      const theirUserId = opponentId || opponentData?.id
+
+      console.log('Initializing game with user IDs:', { myUserId, theirUserId })
+
       // Get the game session and questions
       const { data: lobby } = await supabase
         .from('game_lobbies')
@@ -250,22 +334,27 @@ function FriendChallengeGameContent() {
       setTimeLeft(30)
       setCurrentQuestionIndex(0)
 
-      // Load existing answers
-      await loadMyAnswers()
-      await loadOpponentAnswers()
+      // Load existing answers - pass user IDs directly
+      await loadMyAnswers(myUserId)
+      await loadOpponentAnswers(theirUserId)
     } catch (err) {
       console.error('Error initializing game:', err)
       setError(err.message)
     }
   }
 
-  const loadMyAnswers = async () => {
+  const loadMyAnswers = async (userId) => {
     try {
+      if (!userId) {
+        console.warn('No user ID provided to loadMyAnswers')
+        return
+      }
+
       const { data, error } = await supabase
         .from('friend_challenge_answers')
         .select('question_id, user_answer, is_correct, time_taken')
         .eq('lobby_id', lobbyId)
-        .eq('user_id', currentUserId)
+        .eq('user_id', userId)
 
       if (error) throw error
 
@@ -279,13 +368,18 @@ function FriendChallengeGameContent() {
     }
   }
 
-  const loadOpponentAnswers = async () => {
+  const loadOpponentAnswers = async (opponentUserId) => {
     try {
+      if (!opponentUserId) {
+        console.warn('No opponent user ID provided to loadOpponentAnswers')
+        return
+      }
+
       const { data, error } = await supabase
         .from('friend_challenge_answers')
         .select('question_id, user_answer, is_correct, time_taken')
         .eq('lobby_id', lobbyId)
-        .eq('user_id', opponentData?.id)
+        .eq('user_id', opponentUserId)
 
       if (error) throw error
 
@@ -302,6 +396,14 @@ function FriendChallengeGameContent() {
   const handleAnswer = async (answer) => {
     if (isAnswered || myAnswers[currentQuestion.id]) return
 
+    // Use currentUserId from state, but ensure it exists
+    const userId = currentUserId
+    if (!userId) {
+      console.error('No user ID available for saving answer')
+      setError('Unable to save answer - please refresh the page')
+      return
+    }
+
     const timeTaken = 30 - timeLeft
     const isCorrect = answer === currentQuestion.correct_answer
 
@@ -314,7 +416,7 @@ function FriendChallengeGameContent() {
         .from('friend_challenge_answers')
         .insert({
           lobby_id: lobbyId,
-          user_id: currentUserId,
+          user_id: userId,
           question_id: currentQuestion.id,
           user_answer: answer,
           is_correct: isCorrect,
