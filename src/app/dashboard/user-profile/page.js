@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/utils/supabase'
-import { ArrowLeft, LogOut, Camera, User, Pencil } from 'lucide-react'
+import { ArrowLeft, LogOut, Camera, User, Pencil, Clock, Trophy, Calendar, Hash } from 'lucide-react'
 import { handleLogout, checkAuth } from "@/utils/auth"
 
 export default function UserProfile() {
@@ -12,15 +12,46 @@ export default function UserProfile() {
   const [userLevel, setUserLevel] = useState(1)
   const [joinedDate, setJoinedDate] = useState('')
   const [status, setStatus] = useState('')
+  const [totalPlaytime, setTotalPlaytime] = useState(0)
+  const [gamesPlayed, setGamesPlayed] = useState(0)
   const [editingStatus, setEditingStatus] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [profileImage, setProfileImage] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   const fileInputRef = useRef(null)
   const statusInputRef = useRef(null)
   const router = useRouter()
   const supabase = getSupabase()
 
+  // Format playtime from seconds to human readable format
+  const formatPlaytime = (totalSeconds) => {
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    
+    if (minutes === 0) {
+      return `${seconds}s`
+    } else if (minutes < 60) {
+      return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
+    } else {
+      const hours = Math.floor(minutes / 60)
+      const remainingMinutes = minutes % 60
+      
+      if (hours < 24) {
+        if (remainingMinutes > 0 && seconds > 0) {
+          return `${hours}h ${remainingMinutes}m ${seconds}s`
+        } else if (remainingMinutes > 0) {
+          return `${hours}h ${remainingMinutes}m`
+        } else {
+          return `${hours}h`
+        }
+      } else {
+        const days = Math.floor(hours / 24)
+        const remainingHours = hours % 24
+        return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
+      }
+    }
+  }
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0]
@@ -28,6 +59,12 @@ export default function UserProfile() {
 
     if (!file.type.match('image.*')) {
       alert('Please select an image file')
+      return
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB')
       return
     }
 
@@ -67,48 +104,43 @@ export default function UserProfile() {
     }
   }
 
-  useEffect(() => {
-    const loadProfileImage = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: userData } = await supabase
-            .from('user')
-            .select('profile_image')
-            .eq('auth_id', user.id)
-            .single()
-
-          if (userData?.profile_image) {
-            setProfileImage(userData.profile_image)
-          }
-        }
-      } catch (error) {
-        console.error('Error loading profile image:', error)
-      }
-    }
-
-    loadProfileImage()
-  }, [supabase])
-
   const getUser = useCallback(async () => {
-    const { isAuthenticated, session } = await checkAuth()
-    if (!isAuthenticated) {
-      router.push('/login')
-    } else {
-      setUser(session.user)
-      setJoinedDate(new Date(session.user.created_at).toLocaleDateString())
+    try {
+      setLoading(true)
+      const { isAuthenticated, session } = await checkAuth()
+      if (!isAuthenticated) {
+        router.push('/login')
+        return
+      }
 
+      setUser(session.user)
+      setJoinedDate(new Date(session.user.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }))
+
+      // Fetch user data including new stats
       const { data, error } = await supabase
         .from('user')
-        .select('user_name, user_level, status')
+        .select('user_name, user_level, status, profile_image, total_playtime, games_played')
         .eq('auth_id', session.user.id)
         .single()
       
       if (!error && data) {
-        setUserName(data.user_name)
-        setUserLevel(data.user_level)
-        setStatus(data.status || 'Feeling smart!')
+        setUserName(data.user_name || 'Anonymous User')
+        setUserLevel(data.user_level || 1)
+        setStatus(data.status || 'Ready to play!')
+        setTotalPlaytime(data.total_playtime || 0)
+        setGamesPlayed(data.games_played || 0)
+        if (data.profile_image) {
+          setProfileImage(data.profile_image)
+        }
       }
+    } catch (error) {
+      console.error('Error loading user data:', error)
+    } finally {
+      setLoading(false)
     }
   }, [router, supabase])
 
@@ -128,121 +160,213 @@ export default function UserProfile() {
   }
 
   const updateStatus = async (newStatus) => {
-    if (!user) return;
-    const { error } = await supabase
-      .from('user')
-      .update({ status: newStatus })
-      .eq('auth_id', user.id);
+    if (!user) return
+    try {
+      const { error } = await supabase
+        .from('user')
+        .update({ status: newStatus.trim() })
+        .eq('auth_id', user.id)
 
-    if (error) console.error('Status update failed:', error.message);
-  };
+      if (error) throw error
+    } catch (error) {
+      console.error('Status update failed:', error.message)
+      alert('Failed to update status')
+    }
+  }
 
   const handleStatusChange = (e) => {
-    const newStatus = e.target.value;
-    setStatus(newStatus);
-  };
+    setStatus(e.target.value)
+  }
 
   const handleStatusBlur = async () => {
-    setEditingStatus(false);
-    await updateStatus(status);
-  };
+    setEditingStatus(false)
+    await updateStatus(status)
+  }
 
-  if (!user) return <div className="p-10 text-center">Loading...</div>;
+  const handleStatusKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleStatusBlur()
+    } else if (e.key === 'Escape') {
+      setEditingStatus(false)
+      // Reset status to original value if needed
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
+          <p className="text-amber-800">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Top Bar */}
         <div className="flex justify-between items-center">
-          <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 text-amber-900">
+          <button 
+            onClick={() => router.push('/dashboard')} 
+            className="flex items-center gap-2 text-amber-900 hover:text-amber-700 transition-colors"
+          >
             <ArrowLeft size={18} />
-            <span>Back</span>
+            <span>Back to Dashboard</span>
           </button>
           <button 
             onClick={onLogout} 
             disabled={isLoggingOut} 
-            className="text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
+            <LogOut size={18} />
             {isLoggingOut ? 'Logging Out...' : 'Logout'}
           </button>
         </div>
 
-        {/* Profile Section */}
-        <div className="flex flex-col items-center">
-          <div onClick={() => fileInputRef.current.click()} className="relative group cursor-pointer">
-            <div className="h-32 w-32 rounded-full border-4 border-amber-200 overflow-hidden flex items-center justify-center bg-gradient-to-br from-amber-300 to-amber-500 hover:scale-105 transition-all">
-              {profileImage ? (
-                <img 
-                  src={profileImage} 
-                  alt="Profile" 
-                  className="object-cover w-full h-full"
-                  onError={() => setProfileImage(null)}
-                />
-              ) : (
-                <User size={64} className="text-white" />
-              )}
-            </div>
-            <div className="absolute bottom-2 right-2 bg-white p-1 rounded-full shadow group-hover:opacity-100 opacity-0 transition-opacity duration-300">
-              <Camera size={16} className="text-amber-800" />
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </div>
-
-          <h1 className="text-2xl font-bold text-amber-900 mt-4">{userName}</h1>
-          <p className="text-amber-700">{user.email}</p>
-
-          {/* Status */}
-          <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-xl shadow-lg border border-amber-100 transition-all duration-300 mt-4 w-full">
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-amber-900 text-lg">Status</span>
-              {editingStatus ? (
-                <div className="relative w-full max-w-xs ml-4">
-                  <input
-                    type="text"
-                    value={status}
-                    onChange={handleStatusChange}
-                    onBlur={handleStatusBlur}
-                    ref={statusInputRef}
-                    className="border border-amber-300 rounded-lg px-3 py-2 text-sm w-full text-right text-amber-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent focus:outline-none shadow-sm"
-                    autoFocus
+        {/* Profile Header */}
+        <div className="bg-white/80 backdrop-blur rounded-2xl shadow-lg p-8">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            
+            {/* Profile Image */}
+            <div onClick={() => fileInputRef.current.click()} className="relative group cursor-pointer">
+              <div className="h-32 w-32 rounded-full border-4 border-amber-200 overflow-hidden flex items-center justify-center bg-gradient-to-br from-amber-300 to-amber-500 hover:scale-105 transition-all duration-300">
+                {profileImage ? (
+                  <img 
+                    src={profileImage} 
+                    alt="Profile" 
+                    className="object-cover w-full h-full"
+                    onError={() => setProfileImage(null)}
                   />
+                ) : (
+                  <User size={64} className="text-white" />
+                )}
+              </div>
+              <div className="absolute bottom-2 right-2 bg-white p-2 rounded-full shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Camera size={16} className="text-amber-800" />
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </div>
+
+            {/* Profile Info */}
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-3xl font-bold text-amber-900 mb-2">{userName}</h1>
+              <p className="text-amber-700 mb-4">{user.email}</p>
+              
+              {/* Status */}
+              <div className="bg-gradient-to-r from-amber-50 to-white p-4 rounded-xl border border-amber-200 max-w-md">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-amber-900">Status:</span>
+                  {editingStatus ? (
+                    <input
+                      type="text"
+                      value={status}
+                      onChange={handleStatusChange}
+                      onBlur={handleStatusBlur}
+                      onKeyDown={handleStatusKeyPress}
+                      ref={statusInputRef}
+                      className="border border-amber-300 rounded-lg px-3 py-1 text-sm flex-1 ml-3 text-amber-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent focus:outline-none"
+                      maxLength={100}
+                      autoFocus
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 flex-1 ml-3">
+                      <span className="text-amber-800 font-medium flex-1 text-right truncate">{status}</span>
+                      <button
+                        onClick={() => setEditingStatus(true)}
+                        className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-100 transition-colors duration-200"
+                        aria-label="Edit status"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-3 ml-4">
-                  <span className="text-right text-amber-800 font-medium max-w-xs truncate">{status}</span>
-                  <button
-                    onClick={() => setEditingStatus(true)}
-                    className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-100 transition-colors duration-200"
-                    aria-label="Edit status"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Info Card */}
-        <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md space-y-4">
-          <div className="flex justify-between text-amber-800">
-            <span>User ID</span>
-            <span className="font-mono">{user.id.slice(0, 8)}...</span>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* Games Played */}
+          <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Trophy className="text-blue-600" size={24} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Games Played</p>
+                <p className="text-2xl font-bold text-blue-600">{gamesPlayed.toLocaleString()}</p>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between text-amber-800">
-            <span>Joined</span>
-            <span>{joinedDate}</span>
+
+          {/* Total Playtime */}
+          <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <Clock className="text-green-600" size={24} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Playtime</p>
+                <p className="text-2xl font-bold text-green-600">{formatPlaytime(totalPlaytime)}</p>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between text-amber-800">
-            <span>Level</span>
-            <span>{userLevel}</span>
+
+          {/* User Level */}
+          <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Hash className="text-purple-600" size={24} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Level</p>
+                <p className="text-2xl font-bold text-purple-600">{userLevel}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Member Since */}
+          <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Calendar className="text-amber-600" size={24} />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Member Since</p>
+                <p className="text-lg font-bold text-amber-600">{joinedDate}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Account Details */}
+        <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md">
+          <h3 className="text-xl font-semibold text-amber-900 mb-4">Account Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex justify-between items-center py-2 border-b border-amber-100">
+              <span className="text-amber-800 font-medium">User ID</span>
+              <span className="font-mono text-sm text-amber-700">{user.id.slice(0, 8)}...</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-amber-100">
+              <span className="text-amber-800 font-medium">Email Verified</span>
+              <span className={`text-sm font-medium ${user.email_confirmed_at ? 'text-green-600' : 'text-red-600'}`}>
+                {user.email_confirmed_at ? 'Yes' : 'No'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
