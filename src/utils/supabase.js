@@ -60,4 +60,4 @@ export const useAutoLogout = (options = {}) => {
   }, [enabled, inactivityTimeout, onLogout])
 }
 
-export default getSupabase 
+export default getSupabase;
