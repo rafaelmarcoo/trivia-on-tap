@@ -10,12 +10,15 @@ export default function QuestionDisplay({
   explanation,
   onAnswer,
   onNextQuestion,
+  onBankQuestion,
   isLastQuestion = false,
 }) {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isCorrect, setIsCorrect] = useState(null);
+  const [isBanked, setIsBanked] = useState(false);
+  const [isBanking, setIsBanking] = useState(false);
 
   const handleAnswer = (answer) => {
     if (isAnswered) return;
@@ -48,11 +51,36 @@ export default function QuestionDisplay({
     onAnswer(correct, userInput);
   };
 
+  const handleBankQuestion = async () => {
+    if (isBanked || isBanking) return;
+    
+    setIsBanking(true);
+    try {
+      const questionData = {
+        question_text: question,
+        question_type: type,
+        options: options,
+        correct_answer: correctAnswer,
+        explanations: explanation
+      };
+      
+      await onBankQuestion(questionData);
+      setIsBanked(true);
+    } catch (error) {
+      console.error("Error banking question:", error? error.message : "Unknown error");
+      // Optionally show an error message to the user
+    } finally {
+      setIsBanking(false);
+    }
+  };
+
   const handleNext = () => {
     setSelectedAnswer(null);
     setIsAnswered(false);
     setUserInput("");
     setIsCorrect(null);
+    setIsBanked(false);
+    setIsBanking(false);
     onNextQuestion();
   };
 
@@ -168,6 +196,32 @@ export default function QuestionDisplay({
               <p className="text-blue-800">{explanation}</p>
             </div>
           )}
+          
+          {/* Bank Question Checkbox */}
+          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isBanked}
+                onChange={handleBankQuestion}
+                disabled={isBanked || isBanking}
+                className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 focus:ring-2"
+              />
+              <span className="text-amber-800 font-medium">
+                {isBanking ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+                    Banking question...
+                  </span>
+                ) : isBanked ? (
+                  "✅ Question banked!"
+                ) : (
+                  "💾 Bank this question for later review"
+                )}
+              </span>
+            </label>
+          </div>
+
           <button
             onClick={handleNext}
             className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition-colors"

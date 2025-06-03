@@ -30,6 +30,7 @@ function SinglePlayerGame() {
   const [gameSummary, setGameSummary] = useState(null);
   const [gameSessionId, setGameSessionId] = useState(null);
   const [userAnswers, setUserAnswers] = useState([]);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -117,6 +118,7 @@ function SinglePlayerGame() {
 
       const generatedQuestions = await generateTriviaQuestions(selectedCategories, userLevel);
       setQuestions(generatedQuestions);
+      setSessionStartTime(Date.now());
       setGameState('playing');
     } catch (error) {
       console.error('Error starting game:', error);
@@ -157,6 +159,59 @@ function SinglePlayerGame() {
     }
   };
 
+  const handleBankQuestion = async (questionData) => {
+    try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      if (!user) {
+        console.error('User not authenticated');
+        return;
+      }
+
+      // Check if question already exists in bank to avoid duplicates
+      const { data: existingQuestions, error: checkError } = await supabase
+        .from('question_bank')
+        .select('id')
+        .eq('question_text', questionData.question_text)
+        .eq('user_id', user.id) 
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking existing questions:', checkError);
+        throw checkError;
+      }
+
+      if (existingQuestions && existingQuestions.length > 0) {
+        console.log('Question already banked');
+        return; // Question already exists, don't add duplicate
+      }
+
+      // Insert the question into question_bank
+      const { data, error } = await supabase
+        .from('question_bank')
+        .insert({
+          question_text: questionData.question_text,
+          question_type: questionData.question_type,
+          options: questionData.options,
+          correct_answer: questionData.correct_answer,
+          explanation: questionData.explanations,
+          user_id: user.id 
+        });
+
+      if (error) {
+        console.error('Error banking question:', error);
+        throw error;
+      }
+
+      console.log('Question banked successfully');
+    } catch (error) {
+      console.error('Error in handleBankQuestion:', error);
+      throw error; // Re-throw to be handled by the component
+    }
+  };
+
   const endGame = async () => {
     try {
       // Update game session with final score
@@ -167,6 +222,44 @@ function SinglePlayerGame() {
           ended_at: new Date().toISOString()
         })
         .eq('id', gameSessionId);
+        
+const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000); // seconds
+const time_taken = 30 - timeLeft; // 30 seconds per question
+
+const { data: { user }, error: userError } = await supabase.auth.getUser();
+if (userError || !user) {
+  console.error('User fetch error:', userError?.message || 'User not authenticated');
+  return;
+}
+
+const { data: userData, error: fetchError } = await supabase
+  .from('user')
+  .select('games_played, total_playtime')
+  .eq('auth_id', user.id) // assuming user.id is the authenticated user's ID
+  .single();
+
+if (fetchError) {
+  console.error('Error fetching user data:', fetchError.message);
+  return;
+}
+
+// Calculate new values
+const newGamesPlayed = (userData?.games_played || 0) + 1;
+const newTotalPlaytime = (userData?.total_playtime || 0) + sessionDuration; 
+
+// Update the user record
+const { error: updateError } = await supabase
+  .from('user')
+  .update({
+    games_played: newGamesPlayed,
+    total_playtime: newTotalPlaytime
+  })
+  .eq('auth_id', user.id);
+
+if (updateError) {
+  console.error('Error updating user stats:', updateError.message);
+}
+
 
       // Prepare detailed summary
       const detailedQuestions = questions.map((q, index) => ({
@@ -308,6 +401,7 @@ function SinglePlayerGame() {
                   explanation={currentQuestion.explanation}
                   onAnswer={handleAnswer}
                   onNextQuestion={handleNextQuestion}
+                  onBankQuestion={handleBankQuestion}
                   isLastQuestion={currentQuestionIndex === questions.length - 1}
                 />
               ) : null}

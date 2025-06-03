@@ -184,7 +184,7 @@ export default function UserProfile() {
     setEditingStatus(false)
     await updateStatus(status)
   }
-
+  
   const handleStatusKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleStatusBlur()
@@ -213,7 +213,6 @@ export default function UserProfile() {
       alert('Failed to update privacy setting')
     }
   }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 flex items-center justify-center">
@@ -305,7 +304,6 @@ export default function UserProfile() {
                 className="hidden"
               />
             </div>
-
             {/* Profile Info */}
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-3xl font-bold text-amber-900 mb-2">{userName}</h1>
