@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/utils/supabase'
-import { ArrowLeft, LogOut, Camera, User, Pencil, Clock, Trophy, Calendar, Hash } from 'lucide-react'
+import { ArrowLeft, LogOut, Camera, User, Pencil, Clock, Trophy, Calendar, Hash, Shield, Eye, EyeOff } from 'lucide-react'
 import { handleLogout, checkAuth } from "@/utils/auth"
 
 export default function UserProfile() {
@@ -17,6 +17,7 @@ export default function UserProfile() {
   const [editingStatus, setEditingStatus] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [profileImage, setProfileImage] = useState(null)
+  const [isProfilePrivate, setIsProfilePrivate] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const fileInputRef = useRef(null)
@@ -123,7 +124,7 @@ export default function UserProfile() {
       // Fetch user data including new stats
       const { data, error } = await supabase
         .from('user')
-        .select('user_name, user_level, status, profile_image, total_playtime, games_played')
+        .select('user_name, user_level, status, profile_image, total_playtime, games_played, is_profile_private')
         .eq('auth_id', session.user.id)
         .single()
       
@@ -133,6 +134,7 @@ export default function UserProfile() {
         setStatus(data.status || 'Ready to play!')
         setTotalPlaytime(data.total_playtime || 0)
         setGamesPlayed(data.games_played || 0)
+        setIsProfilePrivate(data.is_profile_private || false)
         if (data.profile_image) {
           setProfileImage(data.profile_image)
         }
@@ -182,7 +184,7 @@ export default function UserProfile() {
     setEditingStatus(false)
     await updateStatus(status)
   }
-
+  
   const handleStatusKeyPress = (e) => {
     if (e.key === 'Enter') {
       handleStatusBlur()
@@ -192,6 +194,25 @@ export default function UserProfile() {
     }
   }
 
+  const togglePrivacy = async () => {
+    if (!user) return
+    
+    const newPrivacySetting = !isProfilePrivate
+    
+    try {
+      const { error } = await supabase
+        .from('user')
+        .update({ is_profile_private: newPrivacySetting })
+        .eq('auth_id', user.id)
+
+      if (error) throw error
+      
+      setIsProfilePrivate(newPrivacySetting)
+    } catch (error) {
+      console.error('Privacy update failed:', error.message)
+      alert('Failed to update privacy setting')
+    }
+  }
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 flex items-center justify-center">
@@ -213,7 +234,7 @@ export default function UserProfile() {
         <div className="flex justify-between items-center">
           <button 
             onClick={() => router.push('/dashboard')} 
-            className="flex items-center gap-2 text-amber-900 hover:text-amber-700 transition-colors"
+            className="flex items-center gap-2 text-amber-900 hover:text-amber-700 hover:bg-amber-100 px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer"
           >
             <ArrowLeft size={18} />
             <span>Back to Dashboard</span>
@@ -221,7 +242,7 @@ export default function UserProfile() {
           <button 
             onClick={onLogout} 
             disabled={isLoggingOut} 
-            className="flex items-center gap-2 text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer disabled:hover:bg-transparent"
           >
             <LogOut size={18} />
             {isLoggingOut ? 'Logging Out...' : 'Logout'}
@@ -229,7 +250,33 @@ export default function UserProfile() {
         </div>
 
         {/* Profile Header */}
-        <div className="bg-white/80 backdrop-blur rounded-2xl shadow-lg p-8">
+        <div className="bg-white/80 backdrop-blur rounded-2xl shadow-lg p-8 relative">
+          
+          {/* Privacy Icon in Corner */}
+          <div className="absolute top-4 right-4 group">
+            <div className="relative">
+              <button
+                onClick={togglePrivacy}
+                className={`p-4 rounded-full transition-all duration-200 cursor-pointer ${
+                  isProfilePrivate 
+                    ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                    : 'bg-green-100 text-green-600 hover:bg-green-200'
+                }`}
+              >
+                {isProfilePrivate ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              
+              {/* Tooltip */}
+              <div className="absolute top-12 right-0 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-800 rotate-45"></div>
+                {isProfilePrivate 
+                  ? "Profile is Private - Click to make Public" 
+                  : "Profile is Public - Click to make Private"
+                }
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             
             {/* Profile Image */}
@@ -257,7 +304,6 @@ export default function UserProfile() {
                 className="hidden"
               />
             </div>
-
             {/* Profile Info */}
             <div className="flex-1 text-center md:text-left">
               <h1 className="text-3xl font-bold text-amber-900 mb-2">{userName}</h1>
@@ -284,7 +330,7 @@ export default function UserProfile() {
                       <span className="text-amber-800 font-medium flex-1 text-right truncate">{status}</span>
                       <button
                         onClick={() => setEditingStatus(true)}
-                        className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-100 transition-colors duration-200"
+                        className="text-amber-600 hover:text-amber-800 p-1 rounded-full hover:bg-amber-100 transition-colors duration-200 cursor-pointer"
                         aria-label="Edit status"
                       >
                         <Pencil size={14} />
