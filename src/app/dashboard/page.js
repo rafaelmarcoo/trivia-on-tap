@@ -257,6 +257,26 @@ export default function Dashboard() {
           </button>
 
           <button
+            onClick={() => router.push("/dashboard/question-bank")}
+            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">📚</span>
+              <span className="text-sm font-bold">Question Bank</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => router.push("/dashboard/tutorial")}
+            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">📖</span>
+              <span className="text-sm font-bold">Tutorial</span>
+            </div>
+          </button>
+
+          <button
             onClick={() => router.push("/dashboard/friends#messages")}
             className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
@@ -272,16 +292,6 @@ export default function Dashboard() {
           </button>
 
           <button
-            onClick={() => router.push("/dashboard/tutorial")}
-            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
-          >
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">📚</span>
-              <span className="text-sm font-bold">Tutorial</span>
-            </div>
-          </button>
-
-          <button
             onClick={() => router.push("/dashboard/leaderboard")}
             className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
@@ -290,15 +300,22 @@ export default function Dashboard() {
               <span className="text-sm font-bold">Leaderboard</span>
             </div>
           </button>
+        </div>
 
-          {/* Level card */}
-          <div className="group bg-white/80 backdrop-blur-md hover:bg-white/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50">
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl group-hover:scale-110 transition-transform duration-300">⭐</span>
-                <span className="text-xl font-bold text-amber-600">Level {userLevel}</span>
+        {/* Level Card */}
+        <div className="w-full max-w-4xl mt-8">
+          <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl shadow-lg border border-amber-200/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-amber-900">Level {userLevel}</h3>
+                <p className="text-amber-700 text-sm">Keep playing to level up!</p>
               </div>
-              <span className="text-xs font-bold text-amber-700">Keep Leveling Up! 🔥</span>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl">⭐</span>
+                <div className="bg-amber-100 px-3 py-1 rounded-full">
+                  <span className="text-amber-800 font-semibold">Level {userLevel}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

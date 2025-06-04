@@ -11,9 +11,11 @@ import {
   ChevronUp,
   AlertCircle,
   CheckCircle,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
 import { getSupabase } from '@/utils/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function QuestionBankDisplay() {
   const [questions, setQuestions] = useState([]);
@@ -27,6 +29,7 @@ export default function QuestionBankDisplay() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const supabase = getSupabase();
+  const router = useRouter();
 
   // Fetch banked questions
   useEffect(() => {
@@ -210,46 +213,59 @@ export default function QuestionBankDisplay() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
       <div className="max-w-6xl mx-auto">
+        {/* Back Button */}
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="mb-8 inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 text-amber-900 rounded-xl transition-all duration-300 shadow-sm border border-amber-200/50 group"
+        >
+          <ArrowLeft size={20} className="text-amber-600 transition-transform duration-300 group-hover:-translate-x-1" />
+          <span>Back to Dashboard</span>
+        </button>
+
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <BookOpen className="text-amber-700" size={32} />
-            <h1 className="text-3xl font-bold text-amber-900">Question Bank</h1>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-8 mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-amber-100/50 rounded-xl">
+              <BookOpen className="text-amber-700" size={32} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-amber-900">Question Bank</h1>
+              <p className="text-amber-700 mt-1">
+                Review and manage your saved questions from previous games
+              </p>
+            </div>
           </div>
-          <p className="text-amber-700">
-            Review and manage your saved questions from previous games
-          </p>
+
+          {error && (
+            <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2">
+              <AlertCircle size={20} />
+              {error}
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
-            <AlertCircle size={20} />
-            {error}
-          </div>
-        )}
-
         {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500" size={20} />
               <input
                 type="text"
                 placeholder="Search questions or explanations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="w-full pl-10 pr-4 py-3 bg-white/80 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-300"
               />
             </div>
 
             {/* Type Filter */}
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500" size={20} />
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white min-w-[180px]"
+                className="pl-10 pr-8 py-3 bg-white/80 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-w-[180px] transition-all duration-300"
               >
                 <option value="all">All Types</option>
                 <option value="multiple-choice">Multiple Choice</option>
@@ -261,14 +277,14 @@ export default function QuestionBankDisplay() {
           </div>
 
           {/* Stats */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="mt-4 pt-4 border-t border-amber-100">
+            <div className="flex items-center justify-between text-sm text-amber-700">
               <span>
                 Showing {filteredQuestions.length} of {questions.length} questions
               </span>
               <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1">
-                  <Clock size={16} />
+                <span className="flex items-center gap-2">
+                  <Clock size={16} className="text-amber-500" />
                   Total saved: {questions.length}
                 </span>
               </div>
@@ -278,12 +294,14 @@ export default function QuestionBankDisplay() {
 
         {/* Questions List */}
         {filteredQuestions.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-            <BookOpen className="mx-auto mb-4 text-gray-400" size={64} />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-12 text-center">
+            <div className="w-20 h-20 bg-amber-100/50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="text-amber-600" size={40} />
+            </div>
+            <h3 className="text-xl font-semibold text-amber-900 mb-2">
               {questions.length === 0 ? 'No questions banked yet' : 'No questions match your filters'}
             </h3>
-            <p className="text-gray-500">
+            <p className="text-amber-700">
               {questions.length === 0 
                 ? 'Start playing games and bank interesting questions to see them here!'
                 : 'Try adjusting your search terms or filters to find what you\'re looking for.'
@@ -293,7 +311,7 @@ export default function QuestionBankDisplay() {
         ) : (
           <div className="space-y-4">
             {filteredQuestions.map((question) => (
-              <div key={question.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div key={question.id} className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 overflow-hidden transition-all duration-300 hover:shadow-xl">
                 <div className="p-6">
                   {/* Question Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -302,7 +320,7 @@ export default function QuestionBankDisplay() {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getQuestionTypeColor(question.question_type)}`}>
                           {formatQuestionType(question.question_type)}
                         </span>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-amber-700">
                           {new Date(question.created_at).toLocaleDateString()}
                         </span>
                       </div>
@@ -315,7 +333,7 @@ export default function QuestionBankDisplay() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleExpanded(question.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="p-2 text-amber-500 hover:text-amber-700 transition-colors"
                         title={expandedQuestions.has(question.id) ? 'Collapse' : 'Expand'}
                       >
                         {expandedQuestions.has(question.id) ? 
@@ -335,18 +353,18 @@ export default function QuestionBankDisplay() {
 
                   {/* Correct Answer Preview */}
                   <div className="mb-3">
-                    <span className="text-sm font-medium text-green-700">
+                    <span className="text-sm font-medium text-green-700 bg-green-50 px-3 py-1 rounded-full">
                       Correct Answer: {question.correct_answer}
                     </span>
                   </div>
 
                   {/* Expanded Content */}
                   {expandedQuestions.has(question.id) && (
-                    <div className="border-t border-gray-100 pt-4">
+                    <div className="border-t border-amber-100 pt-4 mt-4">
                       {renderQuestionOptions(question)}
                       
                       {question.explanations && (
-                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                           <h4 className="font-medium text-blue-900 mb-2">Explanation:</h4>
                           <p className="text-blue-800">{question.explanations}</p>
                         </div>
@@ -361,11 +379,13 @@ export default function QuestionBankDisplay() {
 
         {/* Delete Confirmation Modal */}
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-amber-200/50">
               <div className="flex items-center gap-3 mb-4">
-                <AlertCircle className="text-red-500" size={24} />
-                <h3 className="text-lg font-semibold text-gray-900">Delete Question</h3>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertCircle className="text-red-500" size={24} />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Delete Question</h3>
               </div>
               <p className="text-gray-600 mb-6">
                 Are you sure you want to delete this question from your bank? This action cannot be undone.
@@ -373,7 +393,7 @@ export default function QuestionBankDisplay() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300"
                   disabled={isDeleting}
                 >
                   Cancel
@@ -381,7 +401,7 @@ export default function QuestionBankDisplay() {
                 <button
                   onClick={() => handleDeleteQuestion(deleteConfirm)}
                   disabled={isDeleting}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isDeleting ? (
                     <>
