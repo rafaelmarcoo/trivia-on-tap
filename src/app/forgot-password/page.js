@@ -48,7 +48,7 @@ export default function ForgotPassword() {
                 Reset Password
               </h1>
               <p className="text-amber-700 text-lg font-medium mt-2">
-                Don't worry, we've got you covered! 💪
+                Don&apos;t worry, we&apos;ve got you covered! 💪
               </p>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-amber-800">Forgot Your Password?</h2>
               <p className="text-amber-600 mt-2 text-sm leading-relaxed">
-                Enter your email address and we'll send you step-by-step instructions to reset your password.
+                Enter your email address and we&apos;ll send you step-by-step instructions to reset your password.
               </p>
             </div>
 

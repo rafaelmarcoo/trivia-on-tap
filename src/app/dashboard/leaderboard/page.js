@@ -14,6 +14,8 @@ const CATEGORIES = [
   { id: 'math', name: 'Math' },
 ];
 
+const USERS_PER_PAGE = 20;
+
 export default function LeaderboardPage() {
   const router = useRouter();
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -21,10 +23,12 @@ export default function LeaderboardPage() {
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     fetchLeaderboardData();
-  }, [selectedCategory]);
+  }, [selectedCategory, currentPage]);
 
   const fetchLeaderboardData = async () => {
     setIsLoading(true);
@@ -47,137 +51,133 @@ export default function LeaderboardPage() {
 
       debug.currentUser = user.id;
 
-      // First get all users
+      // Get users first
+      const from = (currentPage - 1) * USERS_PER_PAGE;
+      const to = from + USERS_PER_PAGE - 1;
+
       const { data: users, error: userError } = await supabase
         .from('user')
-        .select('*');
+        .select('*')
+        .range(from, to)
+        .order('user_level', { ascending: false });
 
       if (userError) {
         console.error('User fetch error:', userError);
         throw userError;
       }
 
-      // Get all completed game sessions
-      let query = supabase
+      // Get total count
+      const { count } = await supabase
+        .from('user')
+        .select('*', { count: 'exact', head: true });
+
+      setHasMore(count > to + 1);
+
+      // Get game sessions for these users
+      const userAuthIds = users.map(user => user.auth_id);
+      let sessionsQuery = supabase
         .from('game_sessions')
         .select('*')
+        .in('user_id', userAuthIds)
         .not('ended_at', 'is', null);
 
       // Add category filter if not "all"
       if (selectedCategory !== 'all') {
-        query = query.contains('categories', [selectedCategory]);
+        sessionsQuery = sessionsQuery.contains('categories', [selectedCategory]);
       }
 
-      const { data: sessions, error: sessionError } = await query;
+      const { data: sessions, error: sessionsError } = await sessionsQuery;
 
-      if (sessionError) {
-        console.error('Session fetch error:', sessionError);
-        throw sessionError;
+      if (sessionsError) {
+        console.error('Sessions fetch error:', sessionsError);
+        throw sessionsError;
       }
 
-      // Debug data collection
-      debug.totalUsers = users?.length || 0;
-      debug.totalSessions = sessions?.length || 0;
-      debug.completedSessions = sessions?.length || 0;
-
-      // Create a map of auth_id to user
-      const userMap = {};
-      users.forEach(user => {
-        if (user.auth_id) {
-          userMap[user.auth_id] = user;
+      // Create a map of auth_id to their sessions
+      const userSessions = sessions.reduce((acc, session) => {
+        if (!acc[session.user_id]) {
+          acc[session.user_id] = [];
         }
-      });
-
-      // Initialize scores for all users
-      const userScores = users.reduce((acc, user) => {
-        acc[user.id] = {
-          userId: user.id,
-          authId: user.auth_id,
-          userName: user.user_name || 'Anonymous Player',
-          userLevel: user.user_level || 1,
-          stats: {
-            totalGames: 0,
-            totalScore: 0,
-            highestScore: 0,
-            averageScore: 0,
-            singlePlayerGames: 0,
-            multiPlayerGames: 0,
-            totalQuestionsAnswered: 0,
-            perfectGames: 0,
-            categoryStats: CATEGORIES.reduce((cats, cat) => {
-              cats[cat.id] = {
-                gamesPlayed: 0,
-                totalScore: 0,
-                highestScore: 0,
-                averageScore: 0,
-                perfectGames: 0
-              };
-              return cats;
-            }, {})
-          }
-        };
+        acc[session.user_id].push(session);
         return acc;
       }, {});
 
-      // Process sessions and try to match with users using auth_id
-      let matchedSessions = 0;
-      let unmatchedSessions = 0;
-      sessions.forEach(session => {
-        // Try to find user by auth_id (session.user_id is actually the auth_id)
-        const user = userMap[session.user_id];
-        if (!user) {
-          unmatchedSessions++;
-          return;
-        }
+      if (userError) {
+        console.error('User fetch error:', userError);
+        throw userError;
+      }
 
-        matchedSessions++;
-        const stats = userScores[user.id].stats;
-        stats.totalGames += 1;
-        stats.totalScore += session.score || 0;
-        stats.highestScore = Math.max(stats.highestScore, session.score || 0);
-        stats.totalQuestionsAnswered += session.total_questions || 0;
+              // Process user data
+      const processedUsers = users.map(user => {
+        const stats = {
+          totalGames: 0,
+          totalScore: 0,
+          highestScore: 0,
+          averageScore: 0,
+          singlePlayerGames: 0,
+          multiPlayerGames: 0,
+          totalQuestionsAnswered: 0,
+          perfectGames: 0,
+          categoryStats: CATEGORIES.reduce((cats, cat) => {
+            cats[cat.id] = {
+              gamesPlayed: 0,
+              totalScore: 0,
+              highestScore: 0,
+              averageScore: 0,
+              perfectGames: 0
+            };
+            return cats;
+          }, {})
+        };
 
-        if (session.game_type === 'single_player') {
-          stats.singlePlayerGames += 1;
-        } else {
-          stats.multiPlayerGames += 1;
-        }
+        // Process game sessions
+        const userGameSessions = userSessions[user.auth_id] || [];
+        userGameSessions.forEach(session => {
+          stats.totalGames += 1;
+          stats.totalScore += session.score || 0;
+          stats.highestScore = Math.max(stats.highestScore, session.score || 0);
+          stats.totalQuestionsAnswered += session.total_questions || 0;
 
-        if (session.score === session.total_questions) {
-          stats.perfectGames += 1;
-        }
-
-        // Update category-specific stats
-        session.categories.forEach(category => {
-          const catStats = stats.categoryStats[category];
-          if (catStats) {
-            catStats.gamesPlayed += 1;
-            catStats.totalScore += session.score || 0;
-            catStats.highestScore = Math.max(catStats.highestScore, session.score || 0);
-            if (session.score === session.total_questions) {
-              catStats.perfectGames += 1;
-            }
-            catStats.averageScore = Math.round(catStats.totalScore / catStats.gamesPlayed);
+          if (session.game_type === 'single_player') {
+            stats.singlePlayerGames += 1;
+          } else {
+            stats.multiPlayerGames += 1;
           }
+
+          if (session.score === session.total_questions) {
+            stats.perfectGames += 1;
+          }
+
+          // Update category-specific stats
+          session.categories?.forEach(category => {
+            const catStats = stats.categoryStats[category];
+            if (catStats) {
+              catStats.gamesPlayed += 1;
+              catStats.totalScore += session.score || 0;
+              catStats.highestScore = Math.max(catStats.highestScore, session.score || 0);
+              if (session.score === session.total_questions) {
+                catStats.perfectGames += 1;
+              }
+              catStats.averageScore = Math.round(catStats.totalScore / catStats.gamesPlayed);
+            }
+          });
         });
 
         if (stats.totalGames > 0) {
           stats.averageScore = Math.round(stats.totalScore / stats.totalGames);
         }
+
+        return {
+          userId: user.id,
+          authId: user.auth_id,
+          userName: user.user_name || 'Anonymous Player',
+          userLevel: user.user_level || 1,
+          stats
+        };
       });
 
-      debug.matchedSessions = matchedSessions;
-      debug.unmatchedSessions = unmatchedSessions;
-      debug.processedUsers = Object.keys(userScores).length;
-      debug.usersWithGames = Object.values(userScores).filter(u => {
-        if (selectedCategory === 'all') {
-          return u.stats.totalGames > 0;
-        }
-        return u.stats.categoryStats[selectedCategory].gamesPlayed > 0;
-      }).length;
-
-      // Convert to array and sort based on selected category
-      const leaderboard = Object.values(userScores)
+      // Sort based on selected category
+      const sortedUsers = processedUsers
         .filter(user => {
           if (selectedCategory === 'all') {
             return user.stats.totalGames > 0;
@@ -186,7 +186,6 @@ export default function LeaderboardPage() {
         })
         .sort((a, b) => {
           if (selectedCategory === 'all') {
-            // Sort by overall stats
             if (b.stats.averageScore !== a.stats.averageScore) {
               return b.stats.averageScore - a.stats.averageScore;
             }
@@ -195,7 +194,6 @@ export default function LeaderboardPage() {
             }
             return b.stats.totalGames - a.stats.totalGames;
           } else {
-            // Sort by category-specific stats
             const aStats = a.stats.categoryStats[selectedCategory];
             const bStats = b.stats.categoryStats[selectedCategory];
             if (bStats.averageScore !== aStats.averageScore) {
@@ -208,8 +206,9 @@ export default function LeaderboardPage() {
           }
         });
 
-      debug.finalLeaderboardEntries = leaderboard.length;
-      setLeaderboardData(leaderboard);
+      debug.totalUsers = count;
+      debug.displayedUsers = sortedUsers.length;
+      setLeaderboardData(sortedUsers);
       setDebugInfo(debug);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -244,106 +243,151 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-8 min-h-screen bg-[var(--color-primary)]">
-      <button
-        onClick={() => router.push('/dashboard')}
-        className="mb-4 px-4 py-2 bg-[var(--color-tertiary)] text-[var(--color-primary)] rounded-md flex items-center gap-2"
-      >
-        <span>←</span> Back to Dashboard
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-amber-200 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-amber-200/30 to-amber-300/30 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-amber-200/30 to-amber-300/30 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-amber-100/20 to-amber-200/20 rounded-full blur-3xl"></div>
+      </div>
 
-      <div className="bg-[var(--color-secondary)] p-8 rounded-lg shadow-md">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-[var(--color-fourth)]">
-            Leaderboard Rankings
-          </h1>
-          <div className="flex gap-2">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-[var(--color-primary)] text-[var(--color-fourth)] px-4 py-2 rounded-md border border-[var(--color-fourth)]/20"
-            >
-              {CATEGORIES.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      <div className="relative z-10 max-w-4xl mx-auto p-8">
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="mb-6 px-6 py-3 bg-white/90 backdrop-blur-md text-amber-800 rounded-2xl flex items-center gap-2 hover:bg-white/95 transition-all duration-300 shadow-lg hover:shadow-xl border border-amber-200/50"
+        >
+          <span>←</span> Back to Dashboard
+        </button>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-pulse text-[var(--color-fourth)] text-xl">
-              Loading leaderboard...
+        <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-amber-200/50">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
+              Leaderboard Rankings
+            </h1>
+            <div className="flex gap-2">
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="bg-gradient-to-r from-amber-50 to-amber-100/50 text-amber-800 px-4 py-2 rounded-xl border border-amber-200/50 focus:ring-4 focus:ring-amber-200/50 focus:border-amber-300"
+              >
+                {CATEGORIES.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        ) : leaderboardData.length === 0 ? (
-          <div className="text-center py-8 text-[var(--color-fourth)]">
-            <div>No games played yet in {CATEGORIES.find(c => c.id === selectedCategory).name}!</div>
-            {debugInfo && (
-              <div className="mt-4 text-sm opacity-75">
-                <div>Total Users: {debugInfo.totalUsers}</div>
-                <div>Total Sessions: {debugInfo.totalSessions}</div>
-                <div>Completed Sessions: {debugInfo.completedSessions}</div>
-                <div>Matched Sessions: {debugInfo.matchedSessions}</div>
-                <div>Unmatched Sessions: {debugInfo.unmatchedSessions}</div>
-                <div>Users with Games: {debugInfo.usersWithGames}</div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm text-center shadow-sm">
+              {error}
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-6 py-4 rounded-2xl shadow-lg">
+                <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                <div className="text-amber-800 text-lg font-medium">Loading leaderboard...</div>
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {leaderboardData.map((entry, index) => {
-              const stats = getDisplayStats(entry);
-              return (
-                <div
-                  key={entry.userId}
-                  className="flex items-center bg-[var(--color-primary)] p-4 rounded-lg hover:bg-opacity-90 transition-colors"
-                >
-                  <div className="flex-shrink-0 w-12 h-12 bg-[var(--color-tertiary)] rounded-full flex items-center justify-center text-[var(--color-primary)] font-bold text-xl">
-                    {index + 1}
-                  </div>
-                  <div className="ml-4 flex-grow">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-[var(--color-fourth)]">
-                        {entry.userName}
-                      </h3>
-                      <span className="text-sm text-[var(--color-fourth)]/60">
-                        Level {entry.userLevel}
-                      </span>
-                      {stats.perfectGames > 0 && (
-                        <span className="text-yellow-500 text-xl" title={`${stats.perfectGames} Perfect Games`}>
-                          ⭐
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div className="text-sm text-[var(--color-fourth)]/80">
-                        <span className="font-medium">Average Score:</span> {stats.averageScore}
-                      </div>
-                      <div className="text-sm text-[var(--color-fourth)]/80">
-                        <span className="font-medium">Highest Score:</span> {stats.highestScore}
-                      </div>
-                      <div className="text-sm text-[var(--color-fourth)]/80">
-                        <span className="font-medium">Games Played:</span> {stats.gamesPlayed}
-                      </div>
-                      <div className="text-sm text-[var(--color-fourth)]/80">
-                        <span className="font-medium">Questions Answered:</span> {stats.questionsAnswered}
-                      </div>
-                    </div>
-                  </div>
+            </div>
+          ) : leaderboardData.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="bg-white/80 backdrop-blur-sm px-6 py-8 rounded-2xl shadow-lg inline-block">
+                <div className="text-amber-800 text-lg font-medium mb-2">
+                  No games played yet in {CATEGORIES.find(c => c.id === selectedCategory).name}!
                 </div>
-              );
-            })}
-          </div>
-        )}
+                {debugInfo && (
+                  <div className="mt-4 text-sm text-amber-700/75">
+                    <div>Total Users: {debugInfo.totalUsers}</div>
+                    <div>Displayed Users: {debugInfo.displayedUsers}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {leaderboardData.map((entry, index) => {
+                  const stats = getDisplayStats(entry);
+                  const position = ((currentPage - 1) * USERS_PER_PAGE) + index + 1;
+                  return (
+                    <div
+                      key={entry.userId}
+                      className="group bg-gradient-to-r from-amber-50 to-amber-100/50 p-6 rounded-2xl hover:shadow-lg transition-all duration-300 border border-amber-200/50"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-amber-400 to-amber-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                          {position}
+                        </div>
+                        <div className="flex-grow">
+                          <div className="flex items-center gap-3 mb-3">
+                            <h3 className="text-lg font-bold text-amber-800">
+                              {entry.userName}
+                            </h3>
+                            <span className="px-3 py-1 bg-white/60 rounded-full text-sm font-medium text-amber-700">
+                              Level {entry.userLevel}
+                            </span>
+                            {stats.perfectGames > 0 && (
+                              <span 
+                                className="text-yellow-500 text-xl animate-pulse" 
+                                title={`${stats.perfectGames} Perfect Games`}
+                              >
+                                ⭐
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                              <div className="text-xs text-amber-700 font-medium">Average Score</div>
+                              <div className="text-lg font-bold text-amber-800">{stats.averageScore}</div>
+                            </div>
+                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                              <div className="text-xs text-amber-700 font-medium">Highest Score</div>
+                              <div className="text-lg font-bold text-amber-800">{stats.highestScore}</div>
+                            </div>
+                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                              <div className="text-xs text-amber-700 font-medium">Games Played</div>
+                              <div className="text-lg font-bold text-amber-800">{stats.gamesPlayed}</div>
+                            </div>
+                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                              <div className="text-xs text-amber-700 font-medium">Questions</div>
+                              <div className="text-lg font-bold text-amber-800">{stats.questionsAnswered}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-amber-300/50"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Loading...
+                      </div>
+                    ) : (
+                      'Load More Players'
+                    )}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
