@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2, MessageCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Users, UserPlus, Bell, Search, User, Check, X, Trash2, Trophy, MoreVertical, Gamepad2, MessageCircle, AlertTriangle, Target, Clock } from 'lucide-react'
 import { checkAuth } from "@/utils/auth"
 import { 
   getFriends, 
@@ -31,6 +31,7 @@ function FriendsPageContent() {
   const [successMessage, setSuccessMessage] = useState('')
   const [challengeModal, setChallengeModal] = useState({ isOpen: false, friend: null })
   const [pendingChallengesCount, setPendingChallengesCount] = useState(0)
+  const [acceptedChallengeModal, setAcceptedChallengeModal] = useState({ isOpen: false, challenge: null, opponentName: '', opponentImage: null })
   
   // Messaging state
   const [selectedConversation, setSelectedConversation] = useState(null)
@@ -140,14 +141,19 @@ function FriendsPageContent() {
         console.log('Found accepted challenges:', acceptedChallenges)
         const challenge = acceptedChallenges[0] // Take the first one
         
-        setSuccessMessage('Your challenge was accepted! Click to start the game.')
+        // Get opponent data for the modal
+        const { data: opponentData } = await supabase
+          .from('user')
+          .select('user_name, profile_image')
+          .eq('auth_id', challenge.invited_friend_id)
+          .single()
         
-        // Add a button to start the game
-        setTimeout(() => {
-          if (confirm('Your trivia challenge was accepted! Start the game now?')) {
-            window.location.href = `/dashboard/friends/challenge?lobby=${challenge.id}`
-          }
-        }, 500)
+        setAcceptedChallengeModal({
+          isOpen: true,
+          challenge: challenge,
+          opponentName: opponentData?.user_name || 'Your friend',
+          opponentImage: opponentData?.profile_image
+        })
       }
     } catch (err) {
       console.error('Error checking accepted challenges:', err)
@@ -371,6 +377,14 @@ function FriendsPageContent() {
     setShowMobileChat(true)
   }
 
+  const handleStartAcceptedChallenge = () => {
+    window.location.href = `/dashboard/friends/challenge?lobby=${acceptedChallengeModal.challenge.id}`
+  }
+
+  const handleDismissAcceptedChallenge = () => {
+    setAcceptedChallengeModal({ isOpen: false, challenge: null, opponentName: '', opponentImage: null })
+  }
+
   const TabButton = ({ tab, icon: Icon, label, count = null }) => (
     <button
       onClick={() => {
@@ -378,16 +392,17 @@ function FriendsPageContent() {
         window.location.hash = tab === 'messages' || tab === 'challenges' ? `#${tab}` : ''
         setShowMobileChat(false)
       }}
-      className={`flex items-center gap-3 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+      className={`flex items-center justify-center md:justify-start gap-2 md:gap-3 px-3 md:px-6 py-2 md:py-3 rounded-lg md:rounded-xl font-medium transition-all duration-300 text-sm md:text-base w-full md:w-auto ${
         activeTab === tab
           ? 'bg-amber-500 text-white shadow-md'
           : 'bg-white/50 hover:bg-white/80 text-amber-900 border border-amber-200'
       }`}
     >
-      <Icon size={20} className={activeTab === tab ? 'text-white' : 'text-amber-600'} />
-      <span>{label}</span>
+      <Icon size={16} className={`md:w-5 md:h-5 ${activeTab === tab ? 'text-white' : 'text-amber-600'}`} />
+      <span className="hidden sm:inline">{label}</span>
+      <span className="sm:hidden text-xs truncate">{label.split(' ')[0]}</span>
       {count > 0 && (
-        <span className={`px-2 py-0.5 text-sm rounded-full ${
+        <span className={`px-1.5 md:px-2 py-0.5 text-xs md:text-sm rounded-full ${
           activeTab === tab
             ? 'bg-white text-amber-600'
             : 'bg-amber-500 text-white'
@@ -428,70 +443,149 @@ function FriendsPageContent() {
     </div>
   )
 
-  const UserCard = ({ user, showActions = true, actionType = 'add' }) => (
-    <div className="bg-white/80 backdrop-blur-sm border border-amber-200/50 p-4 rounded-xl transition-all duration-300 hover:bg-white/90">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative w-12 h-12">
-            <div className="absolute inset-0 bg-amber-100 rounded-full overflow-hidden">
-              {(user.profile_image || user.friend_profile_image) ? (
-                <Image
-                  src={user.profile_image || user.friend_profile_image}
-                  alt={user.username || user.friend_username || 'Profile'}
-                  fill
-                  className="object-cover"
+  const AcceptedChallengeModal = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in-0 duration-300">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-amber-200/50 p-6 max-w-md w-full animate-in slide-in-from-bottom-4 duration-300 shadow-2xl">
+        <div className="flex flex-col items-center text-center">
+          {/* Success Icon */}
+          <div className="w-16 h-16 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full flex items-center justify-center mb-4 shadow-lg">
+            <Trophy className="text-green-600" size={32} />
+          </div>
+          
+          {/* Title */}
+          <h3 className="text-2xl font-bold text-amber-900 mb-2">Challenge Accepted!</h3>
+          
+          {/* Opponent Info */}
+          <div className="flex items-center gap-3 mb-4 p-3 bg-amber-50/80 rounded-xl border border-amber-200/50">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl overflow-hidden border-2 border-amber-200/50 shadow-sm">
+              {acceptedChallengeModal.opponentImage ? (
+                <Image 
+                  src={acceptedChallengeModal.opponentImage} 
+                  alt="Opponent" 
+                  width={48}
+                  height={48}
+                  className="object-cover w-full h-full"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <User size={24} className="text-amber-600" />
+                  <User size={20} className="text-amber-600" />
                 </div>
               )}
             </div>
+            <div className="text-left">
+              <p className="font-semibold text-amber-900">{acceptedChallengeModal.opponentName}</p>
+              <p className="text-sm text-amber-700">is ready to battle!</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-medium text-amber-900">
-              {user.username || user.friend_username || 'Unknown User'}
-            </h3>
-            <div className="flex items-center gap-2 text-amber-600">
-              <Trophy size={14} />
-              <span className="text-sm">Level {user.user_level || user.friend_level || 1}</span>
+          
+          {/* Message */}
+          <p className="text-gray-600 mb-6 leading-relaxed">
+            Your trivia challenge has been accepted! Are you ready to start the battle?
+          </p>
+          
+          {/* Battle Format Info */}
+          <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3 mb-6 w-full">
+            <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
+              <div className="flex items-center gap-1">
+                <Target size={14} />
+                <span>10 Questions</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock size={14} />
+                <span>30 sec each</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={handleDismissAcceptedChallenge}
+              className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors duration-200 font-medium"
+            >
+              Later
+            </button>
+            <button
+              onClick={handleStartAcceptedChallenge}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-200 font-bold shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              <Gamepad2 size={18} />
+              Start Battle
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  const UserCard = ({ user, showActions = true, actionType = 'add' }) => (
+    <div className="bg-white/80 backdrop-blur-sm border border-amber-200/50 p-4 rounded-xl transition-all duration-300 hover:bg-white/90 hover:shadow-lg">
+      <div className="flex items-center justify-between gap-4">
+        {/* User Info Section */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="relative w-12 h-12 sm:w-14 sm:h-14 flex-shrink-0">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 rounded-xl overflow-hidden border-2 border-amber-200/50 shadow-sm">
+              {(user.profile_image || user.friend_profile_image) ? (
+            <Image 
+              src={user.profile_image || user.friend_profile_image} 
+                  alt={user.username || user.friend_username || 'Profile'}
+                  fill
+                  className="object-cover"
+            />
+          ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User size={20} className="sm:w-6 sm:h-6 text-amber-600" />
+                </div>
+          )}
+        </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-amber-900 text-sm sm:text-base truncate">
+            {user.username || user.friend_username || 'Unknown User'}
+          </h3>
+            <div className="flex items-center gap-1 text-amber-600 mt-1">
+              <Trophy size={12} className="text-amber-500" />
+              <span className="text-xs sm:text-sm font-medium">Level {user.user_level || user.friend_level || 1}</span>
             </div>
           </div>
         </div>
 
+        {/* Actions Section */}
         {showActions && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {actionType === 'add' && (
               <>
                 {user.is_friend ? (
-                  <span className="text-sm text-green-600 font-medium">Friends</span>
+                  <span className="text-xs sm:text-sm text-green-600 font-medium">Friends</span>
                 ) : user.has_pending_request ? (
-                  <span className="text-sm text-amber-600 font-medium">Pending</span>
+                  <span className="text-xs sm:text-sm text-amber-600 font-medium">Pending</span>
                 ) : (
                   <button
                     onClick={() => handleSendFriendRequest(user.user_id)}
-                    className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors duration-200 flex items-center gap-2"
+                    className="bg-amber-500 text-white p-2 sm:px-4 sm:py-2 rounded-lg hover:bg-amber-600 transition-colors duration-200 flex items-center gap-2"
                   >
                     <UserPlus size={16} />
-                    Add Friend
+                    <span className="hidden sm:inline text-sm">Add Friend</span>
                   </button>
                 )}
               </>
             )}
 
             {actionType === 'accept' && (
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 <button
                   onClick={() => handleAcceptRequest(user.id)}
-                  className="bg-green-500 text-white px-3 py-1 rounded-xl text-sm hover:bg-green-600 transition-colors duration-200"
+                  className="bg-green-500 text-white p-2 sm:px-3 sm:py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
                 >
-                  Accept
+                  <Check size={16} />
+                  <span className="hidden sm:inline text-sm">Accept</span>
                 </button>
                 <button
                   onClick={() => handleRejectRequest(user.id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded-xl text-sm hover:bg-red-600 transition-colors duration-200"
+                  className="bg-red-500 text-white p-2 sm:px-3 sm:py-2 rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-1"
                 >
-                  Reject
+                  <X size={16} />
+                  <span className="hidden sm:inline text-sm">Reject</span>
                 </button>
               </div>
             )}
@@ -499,33 +593,34 @@ function FriendsPageContent() {
             {actionType === 'cancel' && (
               <button
                 onClick={() => handleCancelRequest(user.id)}
-                className="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600 transition-colors duration-200"
+                className="bg-red-500 text-white p-2 sm:px-4 sm:py-2 rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-2"
               >
-                Cancel
+                <X size={16} />
+                <span className="hidden sm:inline text-sm">Cancel</span>
               </button>
             )}
 
             {actionType === 'remove' && (
-              <>
+              <div className="flex gap-1 sm:gap-2">
                 <button
                   onClick={() => handleMessageFriend(user)}
-                  className="bg-green-500 text-white px-3 py-2 rounded-xl hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
+                  className="bg-green-500 text-white p-2 sm:px-3 sm:py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
                   title="Send message"
                 >
                   <MessageCircle size={16} />
-                  Message
+                  <span className="hidden sm:inline text-sm">Message</span>
                 </button>
                 <button
                   onClick={() => handleChallengeFriend(user)}
-                  className="bg-blue-500 text-white px-3 py-2 rounded-xl hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
+                  className="bg-blue-500 text-white p-2 sm:px-3 sm:py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
                   title="Challenge to game"
                 >
                   <Gamepad2 size={16} />
-                  Challenge
+                  <span className="hidden sm:inline text-sm">Challenge</span>
                 </button>
                 <div className="relative group">
-                  <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors duration-200">
-                    <MoreVertical size={16} />
+                  <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200">
+                    <MoreVertical size={16} className="text-gray-600" />
                   </button>
                   <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 min-w-[120px]">
                     <button
@@ -536,7 +631,7 @@ function FriendsPageContent() {
                     </button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -545,26 +640,26 @@ function FriendsPageContent() {
   )
 
   return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         {/* Back Button */}
             <button 
               onClick={() => router.push('/dashboard')} 
-          className="mb-8 inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 text-amber-900 rounded-xl transition-all duration-300 shadow-sm border border-amber-200/50 group"
+          className="mb-6 md:mb-8 inline-flex items-center gap-2 px-3 md:px-4 py-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 text-amber-900 rounded-xl transition-all duration-300 shadow-sm border border-amber-200/50 group text-sm md:text-base"
             >
-          <ArrowLeft size={20} className="text-amber-600 transition-transform duration-300 group-hover:-translate-x-1" />
+          <ArrowLeft size={16} className="md:w-5 md:h-5 text-amber-600 transition-transform duration-300 group-hover:-translate-x-1" />
               <span>Back to Dashboard</span>
             </button>
 
         {/* Main Content */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl md:rounded-2xl shadow-lg border border-amber-200/50 p-4 md:p-8">
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-100/50 rounded-xl">
-                <Users className="text-amber-700" size={32} />
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 md:mb-8">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="p-2 md:p-3 bg-amber-100/50 rounded-xl">
+                <Users className="text-amber-700" size={24} />
           </div>
-              <h1 className="text-3xl font-bold text-amber-900">Friends</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-amber-900">Friends</h1>
             </div>
             
             {/* Success Message */}
@@ -576,12 +671,14 @@ function FriendsPageContent() {
           </div>
 
           {/* Tabs */}
-          <div className="flex flex-wrap gap-3 mb-8">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 mb-6 md:mb-8">
             <TabButton tab="friends" icon={Users} label="Friends" />
             <TabButton tab="requests" icon={Bell} label="Requests" count={friendRequests.received.length} />
             <TabButton tab="add" icon={UserPlus} label="Add Friends" />
             <TabButton tab="messages" icon={MessageCircle} label="Messages" count={unreadMessageCount} />
-            <TabButton tab="challenges" icon={Gamepad2} label="Challenges" count={pendingChallengesCount} />
+            <div className="col-span-2 md:col-span-1">
+              <TabButton tab="challenges" icon={Gamepad2} label="Challenges" count={pendingChallengesCount} />
+            </div>
           </div>
 
           {/* Search Bar */}
@@ -629,65 +726,65 @@ function FriendsPageContent() {
                   <p className="text-amber-700">
                     Start adding friends to challenge them to trivia games!
                   </p>
-                </div>
-              ) : (
+                  </div>
+                ) : (
                 friends.map(friend => (
                   <UserCard key={friend.friend_id} user={friend} actionType="remove" />
                 ))
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
           {/* Friend Requests */}
           {activeTab === 'requests' && !isLoading && (
             <div className="space-y-8">
-              {/* Received Requests */}
-              <div>
+                {/* Received Requests */}
+                <div>
                 <h2 className="text-xl font-semibold text-amber-900 mb-4">Received Requests</h2>
                 <div className="space-y-4">
                   {friendRequests.received.length === 0 ? (
                     <p className="text-amber-700 text-center py-4">No pending friend requests</p>
                   ) : (
                     friendRequests.received.map(request => (
-                      <UserCard 
-                        key={request.id} 
-                        user={{
-                          ...request,
-                          username: request.sender.user_name,
-                          user_level: request.sender.user_level,
-                          profile_image: request.sender.profile_image
-                        }} 
-                        actionType="accept"
-                      />
+                        <UserCard 
+                          key={request.id} 
+                          user={{
+                            ...request,
+                            username: request.sender.user_name,
+                            user_level: request.sender.user_level,
+                            profile_image: request.sender.profile_image
+                          }} 
+                          actionType="accept"
+                        />
                     ))
                   )}
                 </div>
-              </div>
+                </div>
 
-              {/* Sent Requests */}
-              <div>
+                {/* Sent Requests */}
+                <div>
                 <h2 className="text-xl font-semibold text-amber-900 mb-4">Sent Requests</h2>
                 <div className="space-y-4">
                   {friendRequests.sent.length === 0 ? (
                     <p className="text-amber-700 text-center py-4">No sent friend requests</p>
                   ) : (
                     friendRequests.sent.map(request => (
-                      <UserCard 
-                        key={request.id} 
-                        user={{
-                          ...request,
-                          username: request.receiver.user_name,
-                          user_level: request.receiver.user_level,
-                          profile_image: request.receiver.profile_image
-                        }} 
-                        actionType="cancel"
-                      />
+                        <UserCard 
+                          key={request.id} 
+                          user={{
+                            ...request,
+                            username: request.receiver.user_name,
+                            user_level: request.receiver.user_level,
+                            profile_image: request.receiver.profile_image
+                          }} 
+                          actionType="cancel"
+                        />
                     ))
                   )}
                 </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Search Results */}
           {activeTab === 'add' && !isLoading && (
@@ -706,7 +803,7 @@ function FriendsPageContent() {
 
           {/* Messages */}
           {activeTab === 'messages' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[600px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 h-[400px] sm:h-[500px] md:h-[600px]">
               {/* Conversations List */}
               <div className={`md:col-span-1 bg-white/50 backdrop-blur-sm rounded-xl border border-amber-200/50 overflow-hidden ${
                 showMobileChat ? 'hidden md:block' : 'block'
@@ -729,12 +826,12 @@ function FriendsPageContent() {
                     onConversationUpdate={handleConversationUpdate}
                   />
                 ) : (
-                  <div className="text-center p-8">
-                    <MessageCircle size={48} className="text-amber-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-amber-900 mb-2">
+                  <div className="text-center p-2 md:p-8">
+                    <MessageCircle size={32} className="md:w-12 md:h-12 text-amber-400 mx-auto mb-4" />
+                    <h3 className="text-base md:text-xl font-semibold text-amber-900 mb-2">
                       Select a Conversation
                     </h3>
-                    <p className="text-amber-700">
+                    <p className="text-amber-700 text-sm md:text-base">
                       Choose a friend from the list to start chatting
                     </p>
                   </div>
@@ -755,12 +852,12 @@ function FriendsPageContent() {
 
       {/* Challenge Modal */}
       {challengeModal.isOpen && (
-        <FriendChallengeModal
-          isOpen={challengeModal.isOpen}
-          friend={challengeModal.friend}
-          onClose={() => setChallengeModal({ isOpen: false, friend: null })}
-          onChallengeSent={handleChallengeSent}
-        />
+      <FriendChallengeModal
+        isOpen={challengeModal.isOpen}
+        friend={challengeModal.friend}
+        onClose={() => setChallengeModal({ isOpen: false, friend: null })}
+        onChallengeSent={handleChallengeSent}
+      />
       )}
 
       {/* Remove Modal */}
@@ -770,6 +867,9 @@ function FriendsPageContent() {
           onClose={() => setRemoveModal({ isOpen: false, friend: null })}
         />
       )}
+
+      {/* Accepted Challenge Modal */}
+      {acceptedChallengeModal.isOpen && <AcceptedChallengeModal />}
     </div>
   )
 }

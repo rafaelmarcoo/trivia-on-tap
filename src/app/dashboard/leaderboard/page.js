@@ -251,27 +251,27 @@ export default function LeaderboardPage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-amber-100/20 to-amber-200/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto p-8">
+      <div className="relative z-10 max-w-4xl mx-auto p-4 md:p-8">
         <button
           onClick={() => router.push('/dashboard')}
-          className="mb-6 px-6 py-3 bg-white/90 backdrop-blur-md text-amber-800 rounded-2xl flex items-center gap-2 hover:bg-white/95 transition-all duration-300 shadow-lg hover:shadow-xl border border-amber-200/50"
+          className="mb-4 md:mb-6 px-4 md:px-6 py-2 md:py-3 bg-white/90 backdrop-blur-md text-amber-800 rounded-xl md:rounded-2xl flex items-center gap-2 hover:bg-white/95 transition-all duration-300 shadow-lg hover:shadow-xl border border-amber-200/50 text-sm md:text-base"
         >
           <span>←</span> Back to Dashboard
         </button>
 
-        <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-amber-200/50">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
+        <div className="bg-white/90 backdrop-blur-md p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-2xl border border-amber-200/50">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
               Leaderboard Rankings
             </h1>
-            <div className="flex gap-2">
+            <div className="w-full sm:w-auto">
               <select
                 value={selectedCategory}
                 onChange={(e) => {
                   setSelectedCategory(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="bg-gradient-to-r from-amber-50 to-amber-100/50 text-amber-800 px-4 py-2 rounded-xl border border-amber-200/50 focus:ring-4 focus:ring-amber-200/50 focus:border-amber-300"
+                className="w-full sm:w-auto bg-gradient-to-r from-amber-50 to-amber-100/50 text-amber-800 px-3 md:px-4 py-2 rounded-lg md:rounded-xl border border-amber-200/50 focus:ring-4 focus:ring-amber-200/50 focus:border-amber-300 text-sm md:text-base"
               >
                 {CATEGORIES.map(category => (
                   <option key={category.id} value={category.id}>
@@ -283,26 +283,26 @@ export default function LeaderboardPage() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm text-center shadow-sm">
+            <div className="mb-4 md:mb-6 p-3 md:p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl md:rounded-2xl text-xs md:text-sm text-center shadow-sm">
               {error}
             </div>
           )}
 
           {isLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-6 py-4 rounded-2xl shadow-lg">
-                <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
-                <div className="text-amber-800 text-lg font-medium">Loading leaderboard...</div>
+            <div className="text-center py-8 md:py-12">
+              <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl shadow-lg">
+                <div className="w-4 md:w-5 h-4 md:h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                <div className="text-amber-800 text-base md:text-lg font-medium">Loading leaderboard...</div>
               </div>
             </div>
           ) : leaderboardData.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="bg-white/80 backdrop-blur-sm px-6 py-8 rounded-2xl shadow-lg inline-block">
-                <div className="text-amber-800 text-lg font-medium mb-2">
+            <div className="text-center py-8 md:py-12">
+              <div className="bg-white/80 backdrop-blur-sm px-4 md:px-6 py-6 md:py-8 rounded-xl md:rounded-2xl shadow-lg inline-block">
+                <div className="text-amber-800 text-base md:text-lg font-medium mb-2">
                   No games played yet in {CATEGORIES.find(c => c.id === selectedCategory).name}!
                 </div>
                 {debugInfo && (
-                  <div className="mt-4 text-sm text-amber-700/75">
+                  <div className="mt-4 text-xs md:text-sm text-amber-700/75">
                     <div>Total Users: {debugInfo.totalUsers}</div>
                     <div>Displayed Users: {debugInfo.displayedUsers}</div>
                   </div>
@@ -311,52 +311,59 @@ export default function LeaderboardPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {leaderboardData.map((entry, index) => {
                   const stats = getDisplayStats(entry);
                   const position = ((currentPage - 1) * USERS_PER_PAGE) + index + 1;
                   return (
                     <div
                       key={entry.userId}
-                      className="group bg-gradient-to-r from-amber-50 to-amber-100/50 p-6 rounded-2xl hover:shadow-lg transition-all duration-300 border border-amber-200/50"
+                      className="group bg-gradient-to-r from-amber-50 to-amber-100/50 p-4 md:p-6 rounded-xl md:rounded-2xl hover:shadow-lg transition-all duration-300 border border-amber-200/50"
                     >
-                      <div className="flex items-center gap-6">
-                        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-amber-400 to-amber-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                          {position}
-                        </div>
-                        <div className="flex-grow">
-                          <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-lg font-bold text-amber-800">
-                              {entry.userName}
-                            </h3>
-                            <span className="px-3 py-1 bg-white/60 rounded-full text-sm font-medium text-amber-700">
-                              Level {entry.userLevel}
-                            </span>
-                            {stats.perfectGames > 0 && (
-                              <span 
-                                className="text-yellow-500 text-xl animate-pulse" 
-                                title={`${stats.perfectGames} Perfect Games`}
-                              >
-                                ⭐
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                                             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:gap-6">
+                         <div className="flex items-center gap-3 lg:gap-4 w-full lg:w-auto lg:min-w-[300px]">
+                           <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-amber-400 to-amber-500 rounded-lg md:rounded-xl flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                             {position}
+                           </div>
+                           <div className="flex-1 min-w-0 lg:min-w-[200px]">
+                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                               <h3 className="text-base md:text-lg font-bold text-amber-800 sm:truncate lg:truncate-none">
+                                 {entry.userName}
+                               </h3>
+                               <div className="flex items-center gap-2 flex-shrink-0">
+                                 <span className="px-2 md:px-3 py-1 bg-white/60 rounded-full text-xs md:text-sm font-medium text-amber-700">
+                                   Level {entry.userLevel}
+                                 </span>
+                                 {stats.perfectGames > 0 && (
+                                   <span 
+                                     className="text-yellow-500 text-lg md:text-xl animate-pulse" 
+                                     title={`${stats.perfectGames} Perfect Games`}
+                                   >
+                                     ⭐
+                                   </span>
+                                 )}
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                         
+                         <div className="w-full lg:flex-grow lg:max-w-md">
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                            <div className="bg-white/40 px-2 md:px-3 py-2 rounded-lg">
                               <div className="text-xs text-amber-700 font-medium">Average Score</div>
-                              <div className="text-lg font-bold text-amber-800">{stats.averageScore}</div>
+                              <div className="text-sm md:text-lg font-bold text-amber-800">{stats.averageScore}</div>
                             </div>
-                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                            <div className="bg-white/40 px-2 md:px-3 py-2 rounded-lg">
                               <div className="text-xs text-amber-700 font-medium">Highest Score</div>
-                              <div className="text-lg font-bold text-amber-800">{stats.highestScore}</div>
+                              <div className="text-sm md:text-lg font-bold text-amber-800">{stats.highestScore}</div>
                             </div>
-                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                            <div className="bg-white/40 px-2 md:px-3 py-2 rounded-lg">
                               <div className="text-xs text-amber-700 font-medium">Games Played</div>
-                              <div className="text-lg font-bold text-amber-800">{stats.gamesPlayed}</div>
+                              <div className="text-sm md:text-lg font-bold text-amber-800">{stats.gamesPlayed}</div>
                             </div>
-                            <div className="bg-white/40 px-3 py-2 rounded-lg">
+                            <div className="bg-white/40 px-2 md:px-3 py-2 rounded-lg">
                               <div className="text-xs text-amber-700 font-medium">Questions</div>
-                              <div className="text-lg font-bold text-amber-800">{stats.questionsAnswered}</div>
+                              <div className="text-sm md:text-lg font-bold text-amber-800">{stats.questionsAnswered}</div>
                             </div>
                           </div>
                         </div>
@@ -368,14 +375,14 @@ export default function LeaderboardPage() {
 
               {/* Pagination */}
               {hasMore && (
-                <div className="mt-8 text-center">
+                <div className="mt-6 md:mt-8 text-center">
                   <button
                     onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-amber-300/50"
+                    className="w-full sm:w-auto px-4 md:px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-2 border-amber-300/50 text-sm md:text-base"
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         Loading...
                       </div>

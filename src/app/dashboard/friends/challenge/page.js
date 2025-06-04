@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
 import { generateTriviaQuestions } from '@/utils/openai'
 
@@ -704,24 +704,42 @@ function FriendChallengeGameContent() {
     switch (currentQuestion.question_type) {
       case "multiple-choice":
         return (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:gap-4">
             {currentQuestion.options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleAnswer(option)}
                 disabled={isAnswered}
-                className={`p-4 rounded-lg border-2 text-left transition-all duration-200 ${
+                className={`group p-4 md:p-5 rounded-xl border-2 text-left transition-all duration-300 backdrop-blur-sm transform hover:scale-[1.02] ${
                   answered
                     ? option === currentQuestion.correct_answer
-                      ? "bg-green-100 border-green-500 text-green-800"
+                      ? "bg-green-50/80 border-green-300 text-green-800 shadow-lg"
                       : answered.user_answer === option
-                      ? "bg-red-100 border-red-500 text-red-800"
-                      : "bg-gray-100 border-gray-300 text-gray-600"
-                    : "border-amber-200 hover:border-amber-300 hover:bg-amber-50"
-                } disabled:cursor-not-allowed`}
+                      ? "bg-red-50/80 border-red-300 text-red-800 shadow-lg"
+                      : "bg-gray-50/60 border-gray-200 text-gray-500"
+                    : "bg-white/70 border-amber-200 hover:border-amber-400 hover:bg-amber-50/80 hover:shadow-md"
+                } disabled:cursor-not-allowed disabled:transform-none`}
               >
-                <span className="font-medium">{String.fromCharCode(65 + index)}. </span>
-                {option}
+                <div className="flex items-center gap-3">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                    answered
+                      ? option === currentQuestion.correct_answer
+                        ? "bg-green-200 text-green-800"
+                        : answered.user_answer === option
+                        ? "bg-red-200 text-red-800"
+                        : "bg-gray-200 text-gray-600"
+                      : "bg-amber-100 text-amber-700 group-hover:bg-amber-200"
+                  }`}>
+                    {String.fromCharCode(65 + index)}
+                  </div>
+                  <span className="text-sm md:text-base font-medium leading-relaxed">{option}</span>
+                  {answered && option === currentQuestion.correct_answer && (
+                    <CheckCircle className="ml-auto text-green-600" size={20} />
+                  )}
+                  {answered && answered.user_answer === option && option !== currentQuestion.correct_answer && (
+                    <XCircle className="ml-auto text-red-600" size={20} />
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -729,23 +747,31 @@ function FriendChallengeGameContent() {
 
       case "true-false":
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             {currentQuestion.options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleAnswer(option)}
                 disabled={isAnswered}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                className={`group p-4 md:p-6 rounded-xl border-2 transition-all duration-300 backdrop-blur-sm transform hover:scale-[1.02] text-center ${
                   answered
                     ? option === currentQuestion.correct_answer
-                      ? "bg-green-100 border-green-500 text-green-800"
+                      ? "bg-green-50/80 border-green-300 text-green-800 shadow-lg"
                       : answered.user_answer === option
-                      ? "bg-red-100 border-red-500 text-red-800"
-                      : "bg-gray-100 border-gray-300 text-gray-600"
-                    : "border-amber-200 hover:border-amber-300 hover:bg-amber-50"
-                } disabled:cursor-not-allowed`}
+                      ? "bg-red-50/80 border-red-300 text-red-800 shadow-lg"
+                      : "bg-gray-50/60 border-gray-200 text-gray-500"
+                    : "bg-white/70 border-amber-200 hover:border-amber-400 hover:bg-amber-50/80 hover:shadow-md"
+                } disabled:cursor-not-allowed disabled:transform-none`}
               >
-                {option}
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-lg md:text-xl font-bold">{option}</span>
+                  {answered && option === currentQuestion.correct_answer && (
+                    <CheckCircle className="text-green-600" size={24} />
+                  )}
+                  {answered && answered.user_answer === option && option !== currentQuestion.correct_answer && (
+                    <XCircle className="text-red-600" size={24} />
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -755,28 +781,39 @@ function FriendChallengeGameContent() {
       case "math":
         return (
           <form onSubmit={handleInputAnswer} className="space-y-4">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              disabled={isAnswered}
-              className={`w-full p-4 rounded-lg border-2 ${
-                answered
-                  ? answered.is_correct
-                    ? "border-green-500 bg-green-50"
-                    : "border-red-500 bg-red-50"
-                  : "border-amber-200 focus:border-amber-500 focus:outline-none"
-              }`}
-              placeholder={
-                currentQuestion.question_type === "math"
-                  ? "Enter your answer (numbers only)"
-                  : "Enter your answer"
-              }
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                disabled={isAnswered}
+                className={`w-full p-4 md:p-5 rounded-xl border-2 backdrop-blur-sm transition-all duration-300 text-base md:text-lg ${
+                  answered
+                    ? answered.is_correct
+                      ? "border-green-400 bg-green-50/80 text-green-800"
+                      : "border-red-400 bg-red-50/80 text-red-800"
+                    : "border-amber-200 bg-white/70 focus:border-amber-400 focus:bg-white/90 focus:outline-none focus:ring-4 focus:ring-amber-200/50"
+                } disabled:cursor-not-allowed`}
+                placeholder={
+                  currentQuestion.question_type === "math"
+                    ? "Enter your numerical answer..."
+                    : "Type your answer here..."
+                }
+              />
+              {answered && (
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                  {answered.is_correct ? (
+                    <CheckCircle className="text-green-600" size={24} />
+                  ) : (
+                    <XCircle className="text-red-600" size={24} />
+                  )}
+                </div>
+              )}
+            </div>
             <button
               type="submit"
               disabled={isAnswered || !userInput.trim()}
-              className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+              className="w-full py-3 md:py-4 px-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold hover:from-amber-600 hover:to-orange-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none text-base md:text-lg"
             >
               Submit Answer
             </button>
@@ -821,57 +858,60 @@ function FriendChallengeGameContent() {
         )}
 
         {/* Players Info */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-md border border-amber-200 p-3 mb-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
+            {/* You */}
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 bg-amber-200 rounded-lg overflow-hidden flex items-center justify-center">
                 {currentUserProfileImage ? (
                   <Image 
                     src={currentUserProfileImage} 
                     alt="Your profile" 
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
+                    width={40}
+                    height={40}
+                    className="object-cover w-full h-full"
                     onError={(e) => e.target.style.display = 'none'}
                   />
                 ) : (
-                  <User size={32} className="text-amber-600" />
+                  <User size={20} className="text-amber-600" />
                 )}
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">You</h3>
-                <p className="text-sm text-gray-600">
-                  Score: {Object.values(myAnswers).filter(a => a.is_correct).length}/{totalQuestions}
+                <h3 className="font-semibold text-gray-900 text-sm">You</h3>
+                <p className="text-xs text-gray-600">
+                  {Object.values(myAnswers).filter(a => a.is_correct).length}/{totalQuestions}
                 </p>
               </div>
             </div>
 
+            {/* VS */}
             <div className="text-center">
-              <Trophy className="mx-auto mb-2 text-amber-500" size={32} />
-              <p className="text-sm text-gray-600">VS</p>
+              <Trophy className="mx-auto mb-1 text-amber-500" size={20} />
+              <p className="text-xs text-gray-600">VS</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Opponent */}
+            <div className="flex items-center gap-2">
               <div>
-                <h3 className="font-semibold text-gray-900 text-right">
+                <h3 className="font-semibold text-gray-900 text-sm text-right">
                   {opponentData?.username || 'Opponent'}
                 </h3>
-                <p className="text-sm text-gray-600 text-right">
-                  Score: {Object.values(opponentAnswers).filter(a => a.is_correct).length}/{totalQuestions}
+                <p className="text-xs text-gray-600 text-right">
+                  {Object.values(opponentAnswers).filter(a => a.is_correct).length}/{totalQuestions}
                 </p>
               </div>
-              <div className="h-16 w-16 bg-amber-200 rounded-full overflow-hidden flex items-center justify-center">
+              <div className="h-10 w-10 bg-amber-200 rounded-lg overflow-hidden flex items-center justify-center">
                 {opponentData?.profileImage ? (
                   <Image 
                     src={opponentData.profileImage} 
                     alt="Opponent" 
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
+                    width={40}
+                    height={40}
+                    className="object-cover w-full h-full"
                     onError={(e) => e.target.style.display = 'none'}
                   />
                 ) : (
-                  <User size={32} className="text-amber-600" />
+                  <User size={20} className="text-amber-600" />
                 )}
               </div>
             </div>
@@ -909,44 +949,66 @@ function FriendChallengeGameContent() {
         )}
 
         {gameState === 'playing' && currentQuestion && (
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-6 md:p-8">
             {/* Question Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <div className="flex items-center gap-4">
-                <span className="bg-amber-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg">
                   Question {currentQuestionIndex + 1} of {totalQuestions}
                 </span>
-                <div className="flex items-center gap-2 text-red-600">
-                  <Clock size={16} />
-                  <span className="font-mono font-bold">{timeLeft}s</span>
+                <div className="flex items-center gap-2 bg-red-50/80 px-3 py-2 rounded-xl border border-red-200">
+                  <Clock size={18} className="text-red-600" />
+                  <span className="font-mono font-bold text-red-600 text-lg">{timeLeft}s</span>
                 </div>
               </div>
             </div>
 
             {/* Question */}
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                {currentQuestion.question_text}
-              </h2>
+            <div className="mb-8">
+              <div className="flex items-start gap-3 mb-6">
+                <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mt-1">
+                  <span className="text-amber-700 font-bold text-sm">Q</span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 leading-relaxed">
+                  {currentQuestion.question_text}
+                </h2>
+              </div>
 
               {/* Answer Options */}
               {renderQuestionType()}
 
               {/* Answer Status */}
               {isAnswered && myAnswers[currentQuestion.id] && (
-                <div className="mt-6 space-y-4">
-                  <div>
-                    {myAnswers[currentQuestion.id].is_correct ? (
-                      <div className="text-green-700 font-bold text-lg">✅ Correct!</div>
-                    ) : (
-                      <div className="text-red-700 font-bold text-lg">
-                        ❌ Incorrect. The correct answer was: {currentQuestion.correct_answer}
+                <div className="mt-8 space-y-4">
+                  <div className={`p-4 rounded-xl border-2 ${
+                    myAnswers[currentQuestion.id].is_correct 
+                      ? 'bg-green-50/80 border-green-300 text-green-800' 
+                      : 'bg-red-50/80 border-red-300 text-red-800'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      {myAnswers[currentQuestion.id].is_correct ? (
+                        <CheckCircle className="text-green-600" size={24} />
+                      ) : (
+                        <XCircle className="text-red-600" size={24} />
+                      )}
+                      <div>
+                        {myAnswers[currentQuestion.id].is_correct ? (
+                          <div className="font-bold text-lg">Correct!</div>
+                        ) : (
+                          <div>
+                            <div className="font-bold text-lg">Incorrect</div>
+                            <div className="text-sm mt-1">The correct answer was: <span className="font-semibold">{currentQuestion.correct_answer}</span></div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                   {currentQuestion.explanation && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-blue-800">{currentQuestion.explanation}</p>
+                    <div className="p-4 bg-blue-50/80 border-2 border-blue-200 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <HelpCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+                        <p className="text-blue-800 leading-relaxed">{currentQuestion.explanation}</p>
+                      </div>
                     </div>
                   )}
                   <button
