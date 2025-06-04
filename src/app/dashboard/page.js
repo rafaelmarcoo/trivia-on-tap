@@ -230,7 +230,7 @@ export default function Dashboard() {
         </div>
 
         {/* Secondary actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mt-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl mt-8">
           <button
             onClick={() => router.push("/dashboard/game-history")}
             className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
@@ -280,26 +280,25 @@ export default function Dashboard() {
               <span className="text-sm font-bold">Tutorial</span>
             </div>
           </button>
+
           <button
             onClick={() => router.push("/dashboard/leaderboard")}
-            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <span className="text-xl">🏆</span>
-            <span>Leaderboard</span>
-          </button>
-        </div>
-
-        {/* Fun stats or motivational element */}
-        <div className="mt-12 bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-lg border border-amber-200/50 max-w-md text-center">
-          <div className="flex items-center justify-center gap-4 text-amber-800">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-amber-600">Level {userLevel}</div>
-              <div className="text-xs text-amber-700">Current Level</div>
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">🏆</span>
+              <span className="text-sm font-bold">Leaderboard</span>
             </div>
-            <div className="w-px h-8 bg-amber-300"></div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">🔥</div>
-              <div className="text-xs text-amber-700">Keep Leveling Up!</div>
+          </button>
+
+          {/* Level card */}
+          <div className="group bg-white/80 backdrop-blur-md hover:bg-white/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50">
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl group-hover:scale-110 transition-transform duration-300">⭐</span>
+                <span className="text-xl font-bold text-amber-600">Level {userLevel}</span>
+              </div>
+              <span className="text-xs font-bold text-amber-700">Keep Leveling Up! 🔥</span>
             </div>
           </div>
         </div>
