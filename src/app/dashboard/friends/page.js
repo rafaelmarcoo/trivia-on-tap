@@ -461,69 +461,82 @@ function FriendsPageContent() {
 
         {showActions && (
           <div className="flex items-center gap-2">
-            {actionType === 'add' && !user.has_pending_request && (
-              <button
-                onClick={() => handleSendFriendRequest(user.user_id)}
-                className="p-2 text-amber-600 hover:text-amber-800 transition-colors"
-                title="Send Friend Request"
-              >
-                <UserPlus size={20} />
-              </button>
-            )}
-            {actionType === 'add' && user.has_pending_request && (
-              <span className="text-sm text-amber-600 italic">Request Sent</span>
-            )}
-            {actionType === 'request' && (
+            {actionType === 'add' && (
               <>
-                <button
-                  onClick={() => handleAcceptRequest(user.request_id)}
-                  className="p-2 text-green-600 hover:text-green-800 transition-colors"
-                  title="Accept Request"
-                >
-                  <Check size={20} />
-                </button>
-                <button
-                  onClick={() => handleRejectRequest(user.request_id)}
-                  className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                  title="Reject Request"
-                >
-                  <X size={20} />
-                </button>
+                {user.is_friend ? (
+                  <span className="text-sm text-green-600 font-medium">Friends</span>
+                ) : user.has_pending_request ? (
+                  <span className="text-sm text-amber-600 font-medium">Pending</span>
+                ) : (
+                  <button
+                    onClick={() => handleSendFriendRequest(user.user_id)}
+                    className="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors duration-200 flex items-center gap-2"
+                  >
+                    <UserPlus size={16} />
+                    Add Friend
+                  </button>
+                )}
               </>
             )}
+
+            {actionType === 'accept' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleAcceptRequest(user.id)}
+                  className="bg-green-500 text-white px-3 py-1 rounded-xl text-sm hover:bg-green-600 transition-colors duration-200"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => handleRejectRequest(user.id)}
+                  className="bg-red-500 text-white px-3 py-1 rounded-xl text-sm hover:bg-red-600 transition-colors duration-200"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+
             {actionType === 'cancel' && (
               <button
-                onClick={() => handleCancelRequest(user.request_id)}
-                className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                title="Cancel Request"
+                onClick={() => handleCancelRequest(user.id)}
+                className="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600 transition-colors duration-200"
               >
-                <X size={20} />
+                Cancel
               </button>
             )}
-            {actionType === 'friend' && (
-              <div className="flex items-center gap-2">
+
+            {actionType === 'remove' && (
+              <>
                 <button
                   onClick={() => handleMessageFriend(user)}
-                  className="p-2 text-amber-600 hover:text-amber-800 transition-colors"
-                  title="Message"
+                  className="bg-green-500 text-white px-3 py-2 rounded-xl hover:bg-green-600 transition-colors duration-200 flex items-center gap-1"
+                  title="Send message"
                 >
-                  <MessageCircle size={20} />
+                  <MessageCircle size={16} />
+                  Message
                 </button>
                 <button
                   onClick={() => handleChallengeFriend(user)}
-                  className="p-2 text-amber-600 hover:text-amber-800 transition-colors"
-                  title="Challenge"
+                  className="bg-blue-500 text-white px-3 py-2 rounded-xl hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1"
+                  title="Challenge to game"
                 >
-                  <Gamepad2 size={20} />
+                  <Gamepad2 size={16} />
+                  Challenge
                 </button>
-                <button
-                  onClick={() => setRemoveModal({ isOpen: true, friend: user })}
-                  className="p-2 text-red-600 hover:text-red-800 transition-colors"
-                  title="Remove Friend"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
+                <div className="relative group">
+                  <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors duration-200">
+                    <MoreVertical size={16} />
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 min-w-[120px]">
+                    <button
+                      onClick={() => setRemoveModal({ isOpen: true, friend: user })}
+                      className="w-full text-left px-3 py-2 hover:bg-red-50 hover:text-red-600 transition-colors duration-200 text-sm"
+                    >
+                      Remove Friend
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -532,16 +545,16 @@ function FriendsPageContent() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
       <div className="max-w-4xl mx-auto">
         {/* Back Button */}
-        <button
-          onClick={() => router.push('/dashboard')}
+            <button 
+              onClick={() => router.push('/dashboard')} 
           className="mb-8 inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm hover:bg-white/90 text-amber-900 rounded-xl transition-all duration-300 shadow-sm border border-amber-200/50 group"
-        >
+            >
           <ArrowLeft size={20} className="text-amber-600 transition-transform duration-300 group-hover:-translate-x-1" />
-          <span>Back to Dashboard</span>
-        </button>
+              <span>Back to Dashboard</span>
+            </button>
 
         {/* Main Content */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-8">
@@ -550,16 +563,16 @@ function FriendsPageContent() {
             <div className="flex items-center gap-4">
               <div className="p-3 bg-amber-100/50 rounded-xl">
                 <Users className="text-amber-700" size={32} />
-              </div>
+          </div>
               <h1 className="text-3xl font-bold text-amber-900">Friends</h1>
             </div>
             
             {/* Success Message */}
-            {successMessage && (
+          {successMessage && (
               <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg">
-                {successMessage}
-              </div>
-            )}
+              {successMessage}
+            </div>
+          )}
           </div>
 
           {/* Tabs */}
@@ -583,8 +596,8 @@ function FriendsPageContent() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/50 backdrop-blur-sm border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-300"
-              />
-            </div>
+                  />
+                </div>
           )}
 
           {/* Loading State */}
@@ -592,15 +605,15 @@ function FriendsPageContent() {
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-amber-600 mx-auto mb-4"></div>
               <p className="text-amber-800 font-medium">Loading...</p>
-            </div>
+                </div>
           )}
 
           {/* Error State */}
           {error && (
             <div className="bg-red-100/80 backdrop-blur-sm border border-red-200 rounded-xl p-6 text-center">
               <p className="text-red-800">{error}</p>
-            </div>
-          )}
+              </div>
+            )}
 
           {/* Friends List */}
           {activeTab === 'friends' && !isLoading && (
@@ -619,7 +632,7 @@ function FriendsPageContent() {
                 </div>
               ) : (
                 friends.map(friend => (
-                  <UserCard key={friend.user_id} user={friend} actionType="friend" />
+                  <UserCard key={friend.friend_id} user={friend} actionType="remove" />
                 ))
               )}
             </div>
@@ -636,7 +649,16 @@ function FriendsPageContent() {
                     <p className="text-amber-700 text-center py-4">No pending friend requests</p>
                   ) : (
                     friendRequests.received.map(request => (
-                      <UserCard key={request.request_id} user={request} actionType="request" />
+                      <UserCard 
+                        key={request.id} 
+                        user={{
+                          ...request,
+                          username: request.sender.user_name,
+                          user_level: request.sender.user_level,
+                          profile_image: request.sender.profile_image
+                        }} 
+                        actionType="accept"
+                      />
                     ))
                   )}
                 </div>
@@ -650,7 +672,16 @@ function FriendsPageContent() {
                     <p className="text-amber-700 text-center py-4">No sent friend requests</p>
                   ) : (
                     friendRequests.sent.map(request => (
-                      <UserCard key={request.request_id} user={request} actionType="cancel" />
+                      <UserCard 
+                        key={request.id} 
+                        user={{
+                          ...request,
+                          username: request.receiver.user_name,
+                          user_level: request.receiver.user_level,
+                          profile_image: request.receiver.profile_image
+                        }} 
+                        actionType="cancel"
+                      />
                     ))
                   )}
                 </div>
@@ -684,8 +715,8 @@ function FriendsPageContent() {
                   onSelectConversation={handleSelectConversation}
                   selectedConversation={selectedConversation}
                   onConversationUpdate={handleConversationUpdate}
-                />
-              </div>
+                  />
+                </div>
 
               {/* Chat Window */}
               <div className={`md:col-span-2 bg-white/50 backdrop-blur-sm rounded-xl border border-amber-200/50 overflow-hidden ${
@@ -725,13 +756,14 @@ function FriendsPageContent() {
       {/* Challenge Modal */}
       {challengeModal.isOpen && (
         <FriendChallengeModal
+          isOpen={challengeModal.isOpen}
           friend={challengeModal.friend}
           onClose={() => setChallengeModal({ isOpen: false, friend: null })}
           onChallengeSent={handleChallengeSent}
         />
       )}
 
-      {/* Modals */}
+      {/* Remove Modal */}
       {removeModal.isOpen && (
         <RemoveConfirmationModal
           friend={removeModal.friend}
