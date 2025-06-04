@@ -29,10 +29,10 @@ export default function LeaderboardPage() {
   const fetchLeaderboardData = async () => {
     setIsLoading(true);
     setError(null);
-    const supabase = getSupabase();
-    let debug = {};
-
     try {
+      const supabase = getSupabase();
+      let debug = {};
+
       // First check if user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
@@ -213,11 +213,7 @@ export default function LeaderboardPage() {
       setDebugInfo(debug);
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
-      if (error.message.includes('Authentication')) {
-        router.push('/login');
-      } else {
-        setError(error.message || 'Failed to load leaderboard data');
-      }
+      setError(error.message || 'Failed to load leaderboard data');
     } finally {
       setIsLoading(false);
     }
@@ -302,6 +298,11 @@ export default function LeaderboardPage() {
           <div className="space-y-4">
             {leaderboardData.map((entry, index) => {
               const stats = getDisplayStats(entry);
+              // Error check: throw and log if userId is missing
+              if (!entry.userId) {
+                console.error('Error: Missing userId for leaderboard entry', entry);
+                throw new Error('Leaderboard entry missing userId');
+              }
               return (
                 <div
                   key={entry.userId}
@@ -331,7 +332,7 @@ export default function LeaderboardPage() {
                       <div className="text-sm text-[var(--color-fourth)]/80">
                         <span className="font-medium">Highest Score:</span> {stats.highestScore}
                       </div>
-                      <div className="text-sm text-[var(--color-fourth)]/80">
+                      <div className="text-sm text-[var(--color-fourth)]/80"> 
                         <span className="font-medium">Games Played:</span> {stats.gamesPlayed}
                       </div>
                       <div className="text-sm text-[var(--color-fourth)]/80">
