@@ -4,50 +4,57 @@ import { useState } from "react";
 
 export default function Maths({ onComplete }) {
   const [answer, setAnswer] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleChange = (e) => {
     setAnswer(e.target.value);
   };
 
   const handleSubmit = () => {
-    // Handle answer submission logic here
-    console.log("Submitted answer:", answer);
+    setIsSubmitted(true);
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <section>
-        <div className="flex items-center gap-3 mb-4">
-          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-semibold">1</span>
+        <div className="flex items-center gap-4 mb-6">
+          <span className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white font-semibold shadow-md">1</span>
           <h2 className="text-2xl font-semibold text-gray-800">Sample Question</h2>
         </div>
-        <p className="text-gray-600 mb-6 pl-11">
+        <p className="text-gray-600 mb-8 pl-14">
           The question will be displayed here during the actual quiz.
           Enter your numerical answer in the field below.
         </p>
 
-        <div className="pl-11 space-y-4">
-          <div className="space-y-2">
+        <div className="pl-14 space-y-6">
+          <div className="space-y-3">
             <label htmlFor="answer" className="block text-sm font-medium text-gray-700">
               Your Answer
             </label>
-            <input
-              id="answer"
-              type="text"
-              value={answer}
-              onChange={handleChange}
-              className="w-full p-4 rounded-lg border border-gray-200 bg-white focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors"
-              placeholder="Enter your numerical answer"
-            />
+            <div className="relative">
+              <input
+                id="answer"
+                type="text"
+                value={answer}
+                onChange={handleChange}
+                className="w-full p-5 rounded-xl border border-amber-100 bg-white/80 backdrop-blur-sm focus:border-amber-300 focus:ring-2 focus:ring-amber-200 transition-all duration-300 shadow-sm"
+                placeholder="Enter your numerical answer"
+              />
+              {isSubmitted && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <span className="text-2xl">{Math.random() > 0.5 ? "✓" : "✗"}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={answer.trim() === ""}
-            className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
+            className={`w-full py-4 px-6 rounded-xl font-medium transition-all duration-300 ${
               answer.trim() !== ""
-                ? "bg-gray-800 text-white hover:bg-gray-700"
-                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                ? "bg-amber-500 text-white hover:bg-amber-600 shadow-md hover:shadow-lg transform hover:-translate-y-1"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
             }`}
           >
             Submit Answer
@@ -55,21 +62,27 @@ export default function Maths({ onComplete }) {
         </div>
       </section>
 
-      <section className="space-y-6 bg-gray-50 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-800 mb-4">How it works:</h3>
+      <section className="space-y-6 bg-white/80 backdrop-blur-sm p-8 rounded-xl border border-amber-100">
+        <h3 className="text-xl font-semibold text-gray-800 mb-6">How it works:</h3>
         
         <div className="space-y-4">
-          <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center gap-4 p-4 bg-green-50/90 backdrop-blur-sm rounded-xl border border-green-200 transform transition-all duration-300 hover:translate-x-2">
             <div className="flex-1">
-              <p className="text-green-800 font-medium">Correct Answer</p>
-              <p className="text-green-600 text-sm">Your answer matches the expected result</p>
+              <p className="text-green-800 font-medium flex items-center gap-2">
+                <span className="text-lg">✓</span>
+                Correct Answer
+              </p>
+              <p className="text-green-600 text-sm mt-1">Your answer matches the expected result</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center gap-4 p-4 bg-red-50/90 backdrop-blur-sm rounded-xl border border-red-200 transform transition-all duration-300 hover:translate-x-2">
             <div className="flex-1">
-              <p className="text-red-800 font-medium">Incorrect Answer</p>
-              <p className="text-red-600 text-sm">The correct answer was: [answer]</p>
+              <p className="text-red-800 font-medium flex items-center gap-2">
+                <span className="text-lg">✗</span>
+                Incorrect Answer
+              </p>
+              <p className="text-red-600 text-sm mt-1">The correct answer was: [answer]</p>
             </div>
           </div>
         </div>
@@ -78,7 +91,7 @@ export default function Maths({ onComplete }) {
       <section>
         <button
           onClick={onComplete}
-          className="w-full py-4 px-8 rounded-lg text-lg bg-gray-800 hover:bg-gray-700 text-white font-medium transition-colors shadow-md"
+          className="w-full py-4 px-8 rounded-xl text-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-1"
         >
           Complete Tutorial
         </button>

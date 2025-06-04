@@ -282,43 +282,43 @@ if (updateError) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
           <button
             onClick={() => router.push('/dashboard')}
-            className="flex items-center gap-2 text-amber-700 hover:text-amber-900 transition-colors"
+            className="flex items-center gap-2 text-amber-700 hover:text-amber-900 transition-colors text-sm md:text-base"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} className="md:w-[18px] md:h-[18px]" />
             <span>Back to Dashboard</span>
           </button>
-          <h1 className="text-2xl font-bold text-amber-900">Single Player</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-amber-900">Single Player</h1>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-3 md:px-4 py-2 md:py-3 rounded-lg mb-4 md:mb-6 text-sm md:text-base">
             {error}
           </div>
         )}
         
         {gameState === 'selection' ? (
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-8">
-              <Trophy className="mx-auto mb-4 text-amber-500" size={64} />
-              <h2 className="text-3xl font-bold text-amber-900 mb-2">
+          <div className="bg-white rounded-lg shadow-lg p-4 md:p-8">
+            <div className="text-center mb-6 md:mb-8">
+              <Trophy className="mx-auto mb-3 md:mb-4 text-amber-500" size={48} />
+              <h2 className="text-2xl md:text-3xl font-bold text-amber-900 mb-2">
                 Ready to Test Your Knowledge?
               </h2>
-              <p className="text-amber-700 text-lg">
+              <p className="text-amber-700 text-base md:text-lg">
                 Choose your categories and show us what you know!
               </p>
             </div>
             
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold text-amber-900 mb-4">
+            <div className="mb-6 md:mb-8">
+              <h3 className="text-lg md:text-xl font-semibold text-amber-900 mb-3 md:mb-4">
                 Select Categories
               </h3>
-              <p className="text-amber-700 mb-6">
+              <p className="text-amber-700 mb-4 md:mb-6 text-sm md:text-base">
                 Choose the categories you want to play with. You can select multiple categories for a diverse challenge.
               </p>
               
@@ -329,7 +329,7 @@ if (updateError) {
             </div>
             
             <button 
-              className={`w-full py-4 px-8 rounded-lg text-lg font-semibold transition-all duration-200 ${
+              className={`w-full py-3 md:py-4 px-6 md:px-8 rounded-lg text-base md:text-lg font-semibold transition-all duration-200 ${
                 selectedCategories.length > 0 
                   ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md transform hover:scale-105' 
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -339,8 +339,8 @@ if (updateError) {
             >
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Generating Questions...
+                  <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-b-2 border-white"></div>
+                  <span className="text-sm md:text-base">Generating Questions...</span>
                 </div>
               ) : (
                 `Start Game (${selectedCategories.length} ${selectedCategories.length === 1 ? 'category' : 'categories'})`
@@ -355,29 +355,29 @@ if (updateError) {
             showCategories={true}
           />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Game Progress Info */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="bg-white rounded-lg shadow-lg p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                   <div className="flex items-center gap-2">
-                    <Trophy className="text-amber-500" size={24} />
-                    <span className="text-xl font-bold text-amber-900">
+                    <Trophy className="text-amber-500" size={20} />
+                    <span className="text-lg md:text-xl font-bold text-amber-900">
                       Score: {score}/{questions.length}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-red-600">
-                    <Clock size={20} />
-                    <span className="font-mono font-bold text-lg">{timeLeft}s</span>
+                    <Clock size={18} />
+                    <span className="font-mono font-bold text-base md:text-lg">{timeLeft}s</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-amber-700">
+                <div className="text-left sm:text-right w-full sm:w-auto">
+                  <div className="text-xs md:text-sm text-amber-700 mb-2">
                     Question {currentQuestionIndex + 1} of {questions.length}
                   </div>
                   <button
                     onClick={endGame}
-                    className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    className="px-3 md:px-4 py-1.5 md:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs md:text-sm"
                   >
                     End Game
                   </button>
@@ -386,11 +386,11 @@ if (updateError) {
             </div>
 
             {/* Question Card */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-lg p-4 md:p-6">
               {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-                  <p className="text-amber-800 font-medium">Loading questions...</p>
+                <div className="text-center py-6 md:py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-amber-600 mx-auto mb-3 md:mb-4"></div>
+                  <p className="text-amber-800 font-medium text-sm md:text-base">Loading questions...</p>
                 </div>
               ) : currentQuestion ? (
                 <QuestionDisplay

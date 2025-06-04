@@ -12,59 +12,71 @@ export default function TrueFalse({ onNext }) {
   const getButtonClass = (option) => {
     if (selectedOption === option) {
       return option === "True" 
-        ? 'bg-green-100 border-green-500 text-green-800' 
-        : 'bg-red-100 border-red-500 text-red-800';
+        ? 'bg-green-50/90 backdrop-blur-sm border-green-500 text-green-800 shadow-md' 
+        : 'bg-red-50/90 backdrop-blur-sm border-red-500 text-red-800 shadow-md';
     }
-    return 'bg-white border-gray-200 hover:bg-gray-50 text-gray-800';
+    return 'bg-white/80 backdrop-blur-sm border-amber-100 hover:bg-white/90 hover:border-amber-200 hover:shadow-md text-gray-800 transform hover:-translate-y-0.5';
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <section>
-        <div className="flex items-center gap-3 mb-4">
-          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-semibold">1</span>
+        <div className="flex items-center gap-4 mb-6">
+          <span className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white font-semibold shadow-md">1</span>
           <h2 className="text-2xl font-semibold text-gray-800">Sample Question</h2>
         </div>
-        <p className="text-gray-600 mb-6 pl-11">
+        <p className="text-gray-600 mb-8 pl-14">
           Select whether you think the statement is true or false.
           The question will be displayed here in the actual quiz.
         </p>
 
-        <div className="pl-11">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="pl-14">
+          <div className="grid grid-cols-2 gap-6">
             <button
               onClick={() => handleButtonClick("True")}
-              className={`p-4 rounded-lg border transition-colors font-medium ${getButtonClass("True")}`}
+              className={`p-5 rounded-xl border transition-all duration-300 font-medium ${getButtonClass("True")}`}
             >
-              True
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">✓</span>
+                <span>True</span>
+              </div>
             </button>
 
             <button
               onClick={() => handleButtonClick("False")}
-              className={`p-4 rounded-lg border transition-colors font-medium ${getButtonClass("False")}`}
+              className={`p-5 rounded-xl border transition-all duration-300 font-medium ${getButtonClass("False")}`}
             >
-              False
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl">✗</span>
+                <span>False</span>
+              </div>
             </button>
           </div>
         </div>
       </section>
 
       {selectedOption && (
-        <section className="space-y-6 bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-medium text-gray-800 mb-4">How it works:</h3>
+        <section className="space-y-6 bg-white/80 backdrop-blur-sm p-8 rounded-xl border border-amber-100">
+          <h3 className="text-xl font-semibold text-gray-800 mb-6">How it works:</h3>
           
           <div className="space-y-4">
-            <div className="flex items-center gap-4 p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center gap-4 p-4 bg-green-50/90 backdrop-blur-sm rounded-xl border border-green-200 transform transition-all duration-300 hover:translate-x-2">
               <div className="flex-1">
-                <p className="text-green-800 font-medium">True Answer</p>
-                <p className="text-green-600 text-sm">When you select &quot;True&quot;, the button will be highlighted in green</p>
+                <p className="text-green-800 font-medium flex items-center gap-2">
+                  <span className="text-lg">✓</span>
+                  True Answer
+                </p>
+                <p className="text-green-600 text-sm mt-1">When you select &quot;True&quot;, the button will be highlighted in green</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="flex items-center gap-4 p-4 bg-red-50/90 backdrop-blur-sm rounded-xl border border-red-200 transform transition-all duration-300 hover:translate-x-2">
               <div className="flex-1">
-                <p className="text-red-800 font-medium">False Answer</p>
-                <p className="text-red-600 text-sm">When you select &quot;False&quot;, the button will be highlighted in red</p>
+                <p className="text-red-800 font-medium flex items-center gap-2">
+                  <span className="text-lg">✗</span>
+                  False Answer
+                </p>
+                <p className="text-red-600 text-sm mt-1">When you select &quot;False&quot;, the button will be highlighted in red</p>
               </div>
             </div>
           </div>
@@ -74,7 +86,7 @@ export default function TrueFalse({ onNext }) {
       <section>
         <button
           onClick={onNext}
-          className="w-full py-4 px-8 rounded-lg text-lg bg-gray-800 hover:bg-gray-700 text-white font-medium transition-colors shadow-md"
+          className="w-full py-4 px-8 rounded-xl text-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-1"
         >
           Continue to Math Questions
         </button>

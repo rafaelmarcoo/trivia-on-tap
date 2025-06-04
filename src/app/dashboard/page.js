@@ -129,177 +129,178 @@ export default function Dashboard() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-amber-100/20 to-amber-200/20 rounded-full blur-3xl"></div>
       </div>
 
-      {/* Header with profile */}
-      <div className="relative z-10 p-6">
-        <div className="relative">
-          <div
-            onClick={() => router.push('/dashboard/user-profile')}
-            className="inline-flex items-center gap-4 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02] border border-amber-200/50"
-          >
-            <div className="relative">
-              <div className="h-14 w-14 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full shadow-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform hover:scale-105">
-                {profileImage ? (
-                  <img 
-                    src={profileImage} 
-                    alt="Profile" 
-                    className="h-full w-full object-cover"
-                    onError={() => setProfileImage(null)}
-                  />
-                ) : (
-                  <User size={32} className="text-white" />
-                )}
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-r from-green-400 to-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-              </div>
-            </div>
-            <div className="text-amber-900">
-              <p className="font-bold text-lg">{userName}</p>
-              <p className="text-sm text-amber-700 flex items-center gap-1">
-                <span className="text-yellow-500">⭐</span>
-                Level {userLevel}
-              </p>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onLogout()
-              }}
-              disabled={isLoggingOut}
-              className="text-sm text-red-500 hover:text-red-700 transition-colors duration-200 ml-4 px-3 py-1 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {isLoggingOut ? 'Logging out...' : 'Logout'}
-            </button>
-          </div>
-
-          {/* Status bubble */}
-          {status && (
-            <div className="absolute top-full left-8 mt-2 z-20">
-              <div className="relative bg-white/95 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-amber-200/50 max-w-xs">
-                <div className="absolute -top-2 left-6 w-4 h-4 bg-white/95 transform rotate-45 border-l border-t border-amber-200/50"></div>
-                <p className="text-amber-800 text-sm font-medium">
-                  {status}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Main content */}
-      <div className="relative z-10 flex flex-col items-center justify-center px-6 py-8">
+      <div className="relative z-10 flex flex-col items-center justify-center px-4 md:px-6 py-8 md:py-12">
         {/* Welcome section */}
-        <div className="text-center space-y-4 mb-12">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
+        <div className="text-center space-y-3 md:space-y-4 mb-8 md:mb-12">
+          <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
             Trivia on Tap
           </h1>
-          <p className="text-amber-700 text-xl font-medium">
+          <p className="text-amber-700 text-lg md:text-xl font-medium px-4">
             Challenge your mind, one question at a time! 🧠✨
           </p>
         </div>
 
         {/* Game mode buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full max-w-4xl">
           <button
             onClick={() => router.push(`/dashboard/single-player?level=${userLevel}`)}
-            className="group relative bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold py-8 px-8 rounded-3xl shadow-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl border-2 border-amber-300/50"
+            className="group relative bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white font-bold py-6 md:py-8 px-6 md:px-8 rounded-2xl md:rounded-3xl shadow-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl border-2 border-amber-300/50"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative flex items-center justify-center gap-4">
-              <span className="text-4xl">🎮</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 rounded-2xl md:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative flex items-center justify-center gap-3 md:gap-4">
+              <span className="text-2xl md:text-4xl">🎮</span>
               <div className="text-left">
-                <div className="text-xl font-bold">Single Player</div>
-                <div className="text-sm opacity-90">Test your knowledge solo</div>
+                <div className="text-lg md:text-xl font-bold">Single Player</div>
+                <div className="text-xs md:text-sm opacity-90">Test your knowledge solo</div>
               </div>
             </div>
           </button>
 
           <button
             onClick={() => router.push(`/dashboard/multi-player?level=${userLevel}`)}
-            className="group relative bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-8 px-8 rounded-3xl shadow-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl border-2 border-amber-400/50"
+            className="group relative bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold py-6 md:py-8 px-6 md:px-8 rounded-2xl md:rounded-3xl shadow-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl border-2 border-amber-400/50"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative flex items-center justify-center gap-4">
-              <span className="text-4xl">🏆</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-white/10 rounded-2xl md:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative flex items-center justify-center gap-3 md:gap-4">
+              <span className="text-2xl md:text-4xl">🏆</span>
               <div className="text-left">
-                <div className="text-xl font-bold">Multiplayer</div>
-                <div className="text-sm opacity-90">Challenge your friends</div>
+                <div className="text-lg md:text-xl font-bold">Multiplayer</div>
+                <div className="text-xs md:text-sm opacity-90">Challenge your friends</div>
               </div>
             </div>
           </button>
         </div>
 
         {/* Secondary actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mt-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 w-full max-w-4xl mt-6 md:mt-8">
           <button
             onClick={() => router.push("/dashboard/game-history")}
-            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">📊</span>
-              <span className="text-sm font-bold">History</span>
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">📊</span>
+              <span className="text-xs md:text-sm font-bold">History</span>
             </div>
           </button>
 
           <button
             onClick={() => router.push("/dashboard/friends")}
-            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">👥</span>
-              <span className="text-sm font-bold">Friends</span>
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">👥</span>
+              <span className="text-xs md:text-sm font-bold">Friends</span>
             </div>
             {unreadMessageCount > 0 && (
-              <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full h-7 w-7 flex items-center justify-center shadow-lg animate-pulse">
-                {unreadMessageCount}
+              <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full h-5 w-5 md:h-7 md:w-7 flex items-center justify-center shadow-lg animate-pulse">
+                {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
               </div>
             )}
           </button>
 
           <button
-            onClick={() => router.push("/dashboard/friends#messages")}
-            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+            onClick={() => router.push("/dashboard/question-bank")}
+            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">💬</span>
-              <span className="text-sm font-bold">Messages</span>
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">📚</span>
+              <span className="text-xs md:text-sm font-bold">Question Bank</span>
             </div>
-            {unreadMessageCount > 0 && (
-              <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full h-7 w-7 flex items-center justify-center shadow-lg animate-pulse">
-                {unreadMessageCount}
-              </div>
-            )}
           </button>
 
           <button
             onClick={() => router.push("/dashboard/tutorial")}
-            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-6 px-4 rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl group-hover:scale-110 transition-transform duration-300">📚</span>
-              <span className="text-sm font-bold">Tutorial</span>
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">📖</span>
+              <span className="text-xs md:text-sm font-bold">Tutorial</span>
             </div>
           </button>
+
+          <button
+            onClick={() => router.push("/dashboard/friends#messages")}
+            className="group relative bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
+          >
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">💬</span>
+              <span className="text-xs md:text-sm font-bold">Messages</span>
+            </div>
+            {unreadMessageCount > 0 && (
+              <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full h-5 w-5 md:h-7 md:w-7 flex items-center justify-center shadow-lg animate-pulse">
+                {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+              </div>
+            )}
+          </button>
+
           <button
             onClick={() => router.push("/dashboard/leaderboard")}
-            className="w-72 bg-[var(--color-primary)] hover:bg-white text-[var(--color-fourth)] font-semibold py-4 px-8 rounded-2xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+            className="group bg-gradient-to-r from-amber-100/80 to-amber-200/80 backdrop-blur-md hover:from-amber-200/90 hover:to-amber-300/90 text-amber-800 font-semibold py-4 md:py-6 px-3 md:px-4 rounded-xl md:rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-105 hover:shadow-xl border border-amber-200/50"
           >
-            <span className="text-xl">🏆</span>
-            <span>Leaderboard</span>
+            <div className="flex flex-col items-center gap-2 md:gap-3">
+              <span className="text-2xl md:text-3xl group-hover:scale-110 transition-transform duration-300">🏆</span>
+              <span className="text-xs md:text-sm font-bold">Leaderboard</span>
+            </div>
           </button>
         </div>
 
-        {/* Fun stats or motivational element */}
-        <div className="mt-12 bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-lg border border-amber-200/50 max-w-md text-center">
-          <div className="flex items-center justify-center gap-4 text-amber-800">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-amber-600">Level {userLevel}</div>
-              <div className="text-xs text-amber-700">Current Level</div>
-            </div>
-            <div className="w-px h-8 bg-amber-300"></div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">🔥</div>
-              <div className="text-xs text-amber-700">Keep Leveling Up!</div>
+        {/* Profile & Level Card - All in one */}
+        <div className="w-full max-w-4xl mt-6 md:mt-8">
+          <div
+            onClick={() => router.push('/dashboard/user-profile')}
+            className="bg-white/90 backdrop-blur-md p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg border border-amber-200/50 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+              {/* Profile Info */}
+              <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                <div className="relative flex-shrink-0">
+                  <div className="h-12 w-12 md:h-16 md:w-16 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full shadow-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform hover:scale-105">
+                    {profileImage ? (
+                      <img 
+                        src={profileImage} 
+                        alt="Profile" 
+                        className="h-full w-full object-cover"
+                        onError={() => setProfileImage(null)}
+                      />
+                    ) : (
+                      <User size={24} className="text-white md:w-8 md:h-8" />
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-gradient-to-r from-green-400 to-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"></div>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-amber-900 truncate">{userName}</h3>
+                  <p className="text-amber-700 text-xs md:text-sm">Level {userLevel} • Keep playing to level up!</p>
+                  {status && (
+                    <p className="text-xs text-amber-600 mt-1 truncate">
+                      {status}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Level Badge & Logout */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl md:text-3xl">⭐</span>
+                  <div className="bg-amber-100 px-2 md:px-3 py-1 rounded-full">
+                    <span className="text-amber-800 font-semibold text-xs md:text-sm">Level {userLevel}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onLogout()
+                  }}
+                  disabled={isLoggingOut}
+                  className="text-xs md:text-sm text-red-500 hover:text-red-700 transition-colors duration-200 px-2 md:px-3 py-1 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
