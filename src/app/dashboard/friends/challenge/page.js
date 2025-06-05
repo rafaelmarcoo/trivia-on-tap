@@ -107,9 +107,9 @@ function FriendChallengeGameContent() {
           }
         }
         
-        // If we're waiting for opponent and they just answered, check if both are done
-        if (gameState === 'waiting_for_opponent' && payload.new && payload.new.user_id !== currentUserId) {
-          console.log('Opponent answered while we are waiting, checking if both finished...')
+        // Check if both players are finished whenever anyone answers
+        if (payload.new && payload.new.user_id !== currentUserId) {
+          console.log('Opponent answered, checking if both finished...')
           setTimeout(() => {
             checkIfBothPlayersFinished()
           }, 500) // Small delay to ensure database is updated
@@ -467,6 +467,8 @@ function FriendChallengeGameContent() {
 
       if (error) throw error
 
+      console.log('Answer saved successfully for question', currentQuestion.id, 'Answer:', answer)
+
       // Update local state
       setMyAnswers(prev => ({
         ...prev,
@@ -548,6 +550,8 @@ function FriendChallengeGameContent() {
         if (error) {
           console.error('Error saving answer:', error)
           setError('Failed to save answer')
+        } else {
+          console.log('Answer saved successfully for question', currentQuestion.id)
         }
       })
   }
@@ -620,8 +624,11 @@ function FriendChallengeGameContent() {
       setIsAnswered(false)
       setUserInput("")
     } else {
-      // Player finished all questions - check if opponent is also done
-      checkIfBothPlayersFinished()
+      // Player finished all questions - add delay to ensure final answer is saved
+      console.log('Player finished all questions, waiting for final answer to save...')
+      setTimeout(() => {
+        checkIfBothPlayersFinished()
+      }, 1000) // 1 second delay to ensure database save completes
     }
   }
 
@@ -659,6 +666,8 @@ function FriendChallengeGameContent() {
 
       console.log(`Fresh answer counts - Me: ${myAnswerCount}, Opponent: ${opponentAnswerCount}, Total questions: ${totalQuestions}`)
       console.log('All answers:', allAnswers)
+      console.log('My question IDs:', Array.from(myQuestionIds))
+      console.log('Opponent question IDs:', Array.from(opponentQuestionIds))
 
       if (myAnswerCount >= totalQuestions && opponentAnswerCount >= totalQuestions) {
         // Both players finished - show results
@@ -668,10 +677,13 @@ function FriendChallengeGameContent() {
           clearInterval(pollIntervalRef.current)
           pollIntervalRef.current = null
         }
-        finishGame()
-      } else if (gameState !== 'waiting_for_opponent') {
-        // Only start waiting/polling if we're not already doing it
-        console.log('Waiting for opponent to finish...')
+        // Prevent multiple calls to finishGame
+        if (gameState !== 'finished') {
+          finishGame()
+        }
+      } else if (myAnswerCount >= totalQuestions && gameState !== 'waiting_for_opponent' && gameState !== 'finished') {
+        // Only start waiting/polling if we're not already doing it and haven't finished
+        console.log('I finished, waiting for opponent to finish...')
         setGameState('waiting_for_opponent')
         
         // Clear any existing interval
@@ -712,7 +724,10 @@ function FriendChallengeGameContent() {
               console.log('Opponent finished! Showing results...')
               clearInterval(pollIntervalRef.current)
               pollIntervalRef.current = null
-              finishGame()
+              // Prevent multiple calls to finishGame
+              if (gameState !== 'finished') {
+                finishGame()
+              }
             }
           } catch (err) {
             console.error('Error polling for opponent completion:', err)
@@ -723,15 +738,18 @@ function FriendChallengeGameContent() {
           }
         }, 2000) // Poll every 2 seconds
 
-        // Clear interval after 5 minutes to avoid infinite polling
+        // Clear interval after 30 seconds and force finish to prevent infinite waiting
         setTimeout(() => {
           if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current)
             pollIntervalRef.current = null
-            console.log('Polling timeout - showing results anyway')
-            finishGame()
+            console.log('Polling timeout - forcing finish to prevent infinite wait')
+            console.log('Current answers in local state:', Object.keys(myAnswers).length)
+            if (gameState !== 'finished') {
+              finishGame()
+            }
           }
-        }, 300000) // 5 minutes
+        }, 30000) // 30 seconds timeout instead of 5 minutes
       }
     } catch (err) {
       console.error('Error checking player completion:', err)
@@ -741,6 +759,14 @@ function FriendChallengeGameContent() {
   }
 
   const finishGame = async () => {
+    // Prevent multiple calls
+    if (gameState === 'finished') {
+      console.log('Game already finished, skipping...')
+      return
+    }
+    
+    console.log('Finishing game...')
+    
     try {
       // Calculate results using the database function
       const { data: results, error } = await supabase
