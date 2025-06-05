@@ -166,7 +166,7 @@ export default function Dashboard() {
               <span className="text-2xl md:text-4xl">🏆</span>
               <div className="text-left">
                 <div className="text-lg md:text-xl font-bold">Multiplayer</div>
-                <div className="text-xs md:text-sm opacity-90">Challenge your friends</div>
+                <div className="text-xs md:text-sm opacity-90">Compete against random players! (not fully implemented yet)</div>
               </div>
             </div>
           </button>
