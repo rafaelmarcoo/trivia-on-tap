@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle, XCircle, HelpCircle, Archive, Loader2 } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
 import { generateTriviaQuestions } from '@/utils/openai'
 import { awardChallengeXP } from '@/utils/levelingSystem'
@@ -33,6 +33,8 @@ function FriendChallengeGameContent() {
   const [currentUserProfileImage, setCurrentUserProfileImage] = useState(null)
   const [levelUpData, setLevelUpData] = useState(null)
   const [showLevelUpModal, setShowLevelUpModal] = useState(false)
+  const [bankedQuestions, setBankedQuestions] = useState({})
+  const [bankingQuestions, setBankingQuestions] = useState({})
   
   const pollIntervalRef = useRef(null)
 
@@ -550,6 +552,66 @@ function FriendChallengeGameContent() {
       })
   }
 
+  const handleBankQuestion = async (questionData) => {
+    if (bankedQuestions[questionData.id] || bankingQuestions[questionData.id]) return
+    
+    setBankingQuestions(prev => ({ ...prev, [questionData.id]: true }))
+    
+    try {
+      // Get the current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) throw userError
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+
+      // Check if question already exists in bank to avoid duplicates
+      const { data: existingQuestions, error: checkError } = await supabase
+        .from('question_bank')
+        .select('id')
+        .eq('question_text', questionData.question_text)
+        .eq('user_id', user.id) 
+        .limit(1)
+
+      if (checkError) {
+        console.error('Error checking existing questions:', checkError)
+        throw checkError
+      }
+
+      if (existingQuestions && existingQuestions.length > 0) {
+        console.log('Question already banked')
+        setBankedQuestions(prev => ({ ...prev, [questionData.id]: true }))
+        return // Question already exists, don't add duplicate
+      }
+
+      // Insert the question into question_bank
+      const { data, error } = await supabase
+        .from('question_bank')
+        .insert({
+          question_text: questionData.question_text,
+          question_type: questionData.question_type,
+          options: questionData.options,
+          correct_answer: questionData.correct_answer,
+          explanation: questionData.explanation,
+          user_id: user.id 
+        })
+
+      if (error) {
+        console.error('Error banking question:', error)
+        throw error
+      }
+
+      setBankedQuestions(prev => ({ ...prev, [questionData.id]: true }))
+      console.log('Question banked successfully')
+    } catch (error) {
+      console.error('Error in handleBankQuestion:', error)
+    } finally {
+      setBankingQuestions(prev => ({ ...prev, [questionData.id]: false }))
+    }
+  }
+
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1)
@@ -1047,6 +1109,52 @@ function FriendChallengeGameContent() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Bank Question Section */}
+                  <div className="p-4 md:p-5 bg-amber-50/80 backdrop-blur-sm border-2 border-amber-200 rounded-xl shadow-lg">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={bankedQuestions[currentQuestion.id]}
+                          onChange={() => handleBankQuestion({
+                            id: currentQuestion.id,
+                            question_text: currentQuestion.question_text,
+                            question_type: currentQuestion.question_type,
+                            options: currentQuestion.options,
+                            correct_answer: currentQuestion.correct_answer,
+                            explanation: currentQuestion.explanation
+                          })}
+                          disabled={bankedQuestions[currentQuestion.id] || bankingQuestions[currentQuestion.id]}
+                          className="sr-only"
+                        />
+                        <div className={`w-6 h-6 rounded-lg border-2 transition-all duration-300 ${
+                          bankedQuestions[currentQuestion.id] 
+                            ? 'bg-amber-500 border-amber-500' 
+                            : 'border-amber-300 group-hover:border-amber-400'
+                        }`}>
+                          {bankedQuestions[currentQuestion.id] && <CheckCircle className="text-white" size={24} />}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 flex-1">
+                        <Archive className="text-amber-600" size={18} />
+                        <span className="text-amber-800 font-medium text-sm md:text-base">
+                          {bankingQuestions[currentQuestion.id] ? (
+                            <span className="flex items-center gap-2">
+                              <Loader2 className="animate-spin" size={16} />
+                              Banking question...
+                            </span>
+                          ) : bankedQuestions[currentQuestion.id] ? (
+                            "Question banked for review! ✅"
+                          ) : (
+                            "Save this question for later review"
+                          )}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
                   <button
                     onClick={handleNextQuestion}
                     className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg font-semibold hover:bg-amber-600 transition-colors"
