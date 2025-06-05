@@ -3,8 +3,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabase } from '@/utils/supabase'
-import { ArrowLeft, LogOut, Camera, User, Pencil, Clock, Trophy, Calendar, Hash, Shield, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, LogOut, Camera, User, Pencil, Clock, Trophy, Calendar, Hash, Shield, Eye, EyeOff, Star, Zap, Gift } from 'lucide-react'
 import { handleLogout, checkAuth } from "@/utils/auth"
+import { 
+  getLevelProgress, 
+  LEVELING_CONFIG 
+} from '@/utils/levelingSystem'
 
 export default function UserProfile() {
   const [user, setUser] = useState(null)
@@ -19,6 +23,10 @@ export default function UserProfile() {
   const [profileImage, setProfileImage] = useState(null)
   const [isProfilePrivate, setIsProfilePrivate] = useState(false)
   const [loading, setLoading] = useState(true)
+  
+  // XP and Leveling state
+  const [totalXP, setTotalXP] = useState(0)
+  const [levelProgress, setLevelProgress] = useState(null)
 
   const fileInputRef = useRef(null)
   const statusInputRef = useRef(null)
@@ -121,10 +129,10 @@ export default function UserProfile() {
         day: 'numeric'
       }))
 
-      // Fetch user data including new stats
+      // Fetch user data including new stats and XP
       const { data, error } = await supabase
         .from('user')
-        .select('user_name, user_level, status, profile_image, total_playtime, games_played, is_profile_private')
+        .select('user_name, user_level, status, profile_image, total_playtime, games_played, is_profile_private, total_xp')
         .eq('auth_id', session.user.id)
         .single()
       
@@ -135,6 +143,12 @@ export default function UserProfile() {
         setTotalPlaytime(data.total_playtime || 0)
         setGamesPlayed(data.games_played || 0)
         setIsProfilePrivate(data.is_profile_private || false)
+        setTotalXP(data.total_xp || 0)
+        
+        // Calculate level progress
+        const progress = getLevelProgress(data.total_xp || 0)
+        setLevelProgress(progress)
+        
         if (data.profile_image) {
           setProfileImage(data.profile_image)
         }
@@ -213,6 +227,8 @@ export default function UserProfile() {
       alert('Failed to update privacy setting')
     }
   }
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-amber-100 to-orange-100 flex items-center justify-center">
@@ -372,17 +388,40 @@ export default function UserProfile() {
             </div>
           </div>
 
-          {/* User Level */}
+          {/* User Level & XP */}
           <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <Hash className="text-purple-600" size={24} />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-gray-600">Level</p>
                 <p className="text-2xl font-bold text-purple-600">{userLevel}</p>
+                <p className="text-xs text-gray-500">{totalXP.toLocaleString()} Total XP</p>
               </div>
             </div>
+            
+            {/* XP Progress Bar */}
+            {levelProgress && !levelProgress.isMaxLevel && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>Level {levelProgress.currentLevel}</span>
+                  <span>{levelProgress.xpInCurrentLevel} / {levelProgress.xpNeededForNextLevel} XP</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all duration-500"
+                    style={{ width: `${levelProgress.progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {levelProgress && levelProgress.isMaxLevel && (
+              <div className="text-center text-purple-800 font-semibold mt-2 text-sm">
+                🏆 Max Level! 🏆
+              </div>
+            )}
           </div>
 
           {/* Member Since */}
@@ -396,6 +435,80 @@ export default function UserProfile() {
                 <p className="text-lg font-bold text-amber-600">{joinedDate}</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* XP & Leveling System */}
+        <div className="bg-white/70 backdrop-blur p-6 rounded-xl shadow-md">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg">
+              <Star className="text-white" size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-amber-900">XP & Leveling System</h3>
+              <p className="text-amber-700 text-sm">Track your progression and understand how XP works</p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            
+            {/* XP System Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                  <Zap className="text-blue-600" size={18} />
+                  XP Rewards
+                </h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p>Correct Answer: {LEVELING_CONFIG.XP_REWARDS.CORRECT_ANSWER} XP</p>
+                  <p>Perfect Game: {LEVELING_CONFIG.XP_REWARDS.PERFECT_GAME} XP</p>
+                  <p>Challenge Win: {LEVELING_CONFIG.XP_REWARDS.CHALLENGE_WIN} XP</p>
+                  <p>Challenge Loss: {LEVELING_CONFIG.XP_REWARDS.CHALLENGE_LOSS} XP</p>
+                  <p>Quick Answer: {LEVELING_CONFIG.XP_REWARDS.QUICK_ANSWER} XP</p>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+                <h4 className="font-bold text-purple-900 mb-2 flex items-center gap-2">
+                  <Trophy className="text-purple-600" size={18} />
+                  Level System
+                </h4>
+                <div className="text-sm text-purple-800 space-y-1">
+                  <p>Base XP: {LEVELING_CONFIG.BASE_XP_REQUIRED}</p>
+                  <p>Growth: {LEVELING_CONFIG.LEVEL_MULTIPLIER}x per level</p>
+                  <p>Max Level: {LEVELING_CONFIG.MAX_LEVEL}</p>
+                  <p>Current: Level {userLevel}</p>
+                  <p>Difficulty Bonus: Easy (1x), Medium (1.2x), Hard (1.5x)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Level Progress Details */}
+            {levelProgress && (
+              <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200">
+                <h4 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                  📊 Detailed Progress
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-indigo-700 font-medium">Current Level</p>
+                    <p className="text-indigo-900 font-bold">{levelProgress.currentLevel}</p>
+                  </div>
+                  <div>
+                    <p className="text-indigo-700 font-medium">Total XP</p>
+                    <p className="text-indigo-900 font-bold">{levelProgress.totalXP.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-indigo-700 font-medium">Current Level XP</p>
+                    <p className="text-indigo-900 font-bold">{levelProgress.xpInCurrentLevel} / {levelProgress.xpNeededForNextLevel}</p>
+                  </div>
+                  <div>
+                    <p className="text-indigo-700 font-medium">Progress</p>
+                    <p className="text-indigo-900 font-bold">{levelProgress.progressPercent}%</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
