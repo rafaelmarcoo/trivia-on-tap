@@ -54,6 +54,11 @@ export default function InGameNotificationProvider({ children }) {
   const checkAcceptedChallenges = useCallback(async () => {
     if (!currentUserId) return
     
+    // Don't show modal if we're already on the challenge page
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/challenge')) {
+      return
+    }
+    
     try {
       const supabase = getSupabase()
       
