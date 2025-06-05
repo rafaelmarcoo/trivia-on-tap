@@ -58,9 +58,10 @@ export default function InGameNotificationProvider({ children }) {
       const supabase = getSupabase()
       
       // Check for challenges where I'm the host and status is 'challenge_accepted'
+      // but exclude challenges that are already in progress or completed
       const { data: acceptedChallenges, error } = await supabase
         .from('game_lobbies')
-        .select('id, invited_friend_id, created_at')
+        .select('id, invited_friend_id, created_at, status')
         .eq('host_id', currentUserId)
         .eq('lobby_type', 'friend_challenge')
         .eq('status', 'challenge_accepted')
@@ -137,6 +138,30 @@ export default function InGameNotificationProvider({ children }) {
 
     const supabase = getSupabase()
     loadUnreadCount()
+
+    // Subscribe to lobby status changes to dismiss modal when game starts
+    const lobbyStatusChannel = supabase
+      .channel('lobby_status_changes')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'game_lobbies',
+          filter: `host_id=eq.${currentUserId}`
+        }, 
+        (payload) => {
+          const updatedLobby = payload.new
+          
+          // If this is the lobby in our modal and it's now in progress, dismiss the modal
+          if (acceptedChallengeModal.isOpen && 
+              acceptedChallengeModal.challenge && 
+              acceptedChallengeModal.challenge.id === updatedLobby.id &&
+              updatedLobby.status === 'in_progress') {
+            setAcceptedChallengeModal({ isOpen: false, challenge: null, opponentName: '', opponentImage: null })
+          }
+        }
+      )
+      .subscribe()
 
     // Subscribe to new messages - now shows everywhere
     const messagesChannel = supabase
@@ -288,6 +313,7 @@ export default function InGameNotificationProvider({ children }) {
       .subscribe()
 
     return () => {
+      supabase.removeChannel(lobbyStatusChannel)
       supabase.removeChannel(messagesChannel)
       supabase.removeChannel(friendRequestsChannel)
       supabase.removeChannel(challengesChannel)
