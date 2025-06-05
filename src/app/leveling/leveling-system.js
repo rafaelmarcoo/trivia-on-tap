@@ -326,7 +326,7 @@ const LevelingSystem = () => {
                 <Trophy size={48} className="mx-auto" />
               </div>
               <p className="text-amber-800 text-lg">No users found</p>
-              <p className="text-amber-600">Users will appear here once they're registered</p>
+              <p className="text-amber-600">Users will appear here once they&apos;re registered</p>
             </div>
           )}
         </div>
