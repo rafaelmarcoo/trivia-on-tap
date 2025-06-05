@@ -9,6 +9,8 @@ import QuestionDisplay from './components/QuestionDisplay';
 import GameSummary from '../components/GameSummary';
 import { generateTriviaQuestions } from '@/utils/openai';
 import { useNotifications } from '@/components/notifications/InGameNotificationProvider'
+import { awardSinglePlayerXP } from '@/utils/levelingSystem'
+import LevelUpModal from '@/components/LevelUpModal'
 
 function SinglePlayerGame() {
   const router = useRouter();
@@ -31,6 +33,8 @@ function SinglePlayerGame() {
   const [gameSessionId, setGameSessionId] = useState(null);
   const [userAnswers, setUserAnswers] = useState([]);
   const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [levelUpData, setLevelUpData] = useState(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -224,7 +228,6 @@ function SinglePlayerGame() {
         .eq('id', gameSessionId);
         
 const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000); // seconds
-const time_taken = 30 - timeLeft; // 30 seconds per question
 
 const { data: { user }, error: userError } = await supabase.auth.getUser();
 if (userError || !user) {
@@ -235,7 +238,7 @@ if (userError || !user) {
 const { data: userData, error: fetchError } = await supabase
   .from('user')
   .select('games_played, total_playtime')
-  .eq('auth_id', user.id) // assuming user.id is the authenticated user's ID
+  .eq('auth_id', user.id)
   .single();
 
 if (fetchError) {
@@ -260,13 +263,37 @@ if (updateError) {
   console.error('Error updating user stats:', updateError.message);
 }
 
+      // Prepare detailed questions with timing data
+      const detailedQuestions = questions.map((q, index) => {
+        const userAnswer = userAnswers[index];
+        return {
+          ...q,
+          userAnswer: userAnswer?.user_answer,
+          isCorrect: userAnswer?.is_correct,
+          timeTaken: userAnswer?.time_taken || 0
+        };
+      });
 
-      // Prepare detailed summary
-      const detailedQuestions = questions.map((q, index) => ({
-        ...q,
-        userAnswer: userAnswers[index]?.user_answer,
-        isCorrect: userAnswers[index]?.is_correct
-      }));
+      // Award XP for the game
+      try {
+        const gameData = {
+          score,
+          totalQuestions: questions.length,
+          questions: detailedQuestions,
+          difficulty: userLevel <= 5 ? 'easy' : userLevel <= 15 ? 'medium' : 'hard',
+          categories: selectedCategories
+        };
+
+        const xpResult = await awardSinglePlayerXP(user.id, gameData);
+        
+        if (xpResult.success && xpResult.data.leveledUp) {
+          // Show level up modal
+          setLevelUpData(xpResult.data);
+          setShowLevelUpModal(true);
+        }
+      } catch (xpError) {
+        console.error('Error awarding XP:', xpError);
+      }
 
       setGameSummary({
         score,
@@ -408,6 +435,13 @@ if (updateError) {
             </div>
           </div>
         )}
+
+        {/* Level Up Modal */}
+        <LevelUpModal
+          isOpen={showLevelUpModal}
+          onClose={() => setShowLevelUpModal(false)}
+          levelUpData={levelUpData}
+        />
       </div>
     </div>
   );
