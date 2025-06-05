@@ -1071,13 +1071,17 @@ function FriendChallengeGameContent() {
                 <div>
                   <h3 className="font-semibold text-gray-900">You</h3>
                   <p className="text-2xl font-bold text-amber-600">
-                    {gameResults.challenger_score}/{gameResults.total_questions}
+                    {gameResults.challenger_id === currentUserId 
+                      ? gameResults.challenger_score 
+                      : gameResults.challenged_score}/{gameResults.total_questions}
                   </p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{opponentData?.username}</h3>
                   <p className="text-2xl font-bold text-amber-600">
-                    {gameResults.challenged_score}/{gameResults.total_questions}
+                    {gameResults.challenger_id === currentUserId 
+                      ? gameResults.challenged_score 
+                      : gameResults.challenger_score}/{gameResults.total_questions}
                   </p>
                 </div>
               </div>
