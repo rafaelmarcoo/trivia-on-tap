@@ -9,6 +9,14 @@ const LevelUpModal = ({
 }) => {
   const [showDetails, setShowDetails] = useState(false)
   
+  useEffect(() => {
+    if (isOpen) {
+      // Show details after animation
+      const timer = setTimeout(() => setShowDetails(true), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen])
+
   if (!isOpen || !levelUpData) return null
 
   const {
@@ -20,14 +28,6 @@ const LevelUpModal = ({
   } = levelUpData
 
   const levelDifference = newLevel - oldLevel
-
-  useEffect(() => {
-    if (isOpen) {
-      // Show details after animation
-      const timer = setTimeout(() => setShowDetails(true), 500)
-      return () => clearTimeout(timer)
-    }
-  }, [isOpen])
 
   const handleClose = () => {
     setShowDetails(false)

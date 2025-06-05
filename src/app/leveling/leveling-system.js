@@ -248,9 +248,9 @@ const LevelingSystem = () => {
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-amber-900 mb-4">Players ({users.length})</h2>
             
-            {users.map((user) => (
-              <div
-                key={user.id}
+        {users.map((user) => (
+          <div
+            key={user.id}
                 className="bg-gradient-to-r from-white/60 to-amber-50/60 backdrop-blur-sm border border-amber-200/50 p-6 rounded-xl hover:shadow-lg transition-all duration-300"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -301,19 +301,19 @@ const LevelingSystem = () => {
                       +{xpToAward} XP
                     </button>
                     
-                    <button
+            <button
                       onClick={() => simulateSinglePlayerGame(user)}
                       className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-sm font-medium"
-                    >
+            >
                       🎮 Single Player
-                    </button>
+            </button>
                     
-                    <button
+            <button
                       onClick={() => simulateChallenge(user)}
                       className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 text-sm font-medium"
                     >
                       ⚔️ Challenge
-                    </button>
+            </button>
                   </div>
                 </div>
               </div>
