@@ -777,6 +777,47 @@ function FriendChallengeGameContent() {
       setGameResults(results)
       setGameState('finished')
 
+      // Update game statistics (games played and total playtime)
+      try {
+        const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000); // seconds
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.error('User fetch error:', userError?.message || 'User not authenticated');
+        } else {
+          const { data: userData, error: fetchError } = await supabase
+            .from('user')
+            .select('games_played, total_playtime')
+            .eq('auth_id', user.id)
+            .single();
+
+          if (fetchError) {
+            console.error('Error fetching user data:', fetchError.message);
+          } else {
+            // Calculate new values
+            const newGamesPlayed = (userData?.games_played || 0) + 1;
+            const newTotalPlaytime = (userData?.total_playtime || 0) + sessionDuration; 
+
+            // Update the user record
+            const { error: updateError } = await supabase
+              .from('user')
+              .update({
+                games_played: newGamesPlayed,
+                total_playtime: newTotalPlaytime
+              })
+              .eq('auth_id', user.id);
+
+            if (updateError) {
+              console.error('Error updating user stats:', updateError.message);
+            } else {
+              console.log(`Updated user stats: Games: ${newGamesPlayed}, Playtime: ${newTotalPlaytime}s`);
+            }
+          }
+        }
+      } catch (statsError) {
+        console.error('Error updating game statistics:', statsError);
+      }
+
       // Award XP for the challenge
       try {
         const playerScore = results.challenger_id === currentUserId 
