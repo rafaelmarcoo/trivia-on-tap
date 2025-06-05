@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { Gamepad2, Trophy, Clock, CheckCircle, XCircle, Star, User, Target, Zap, Calendar } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
+import { expireOldChallenges } from '@/utils/challengeExpiration'
 import Image from 'next/image'
 
-export default function ChallengeInvitations({ onChallengeAccepted }) {
+export default function ChallengeInvitations({ onChallengeAccepted, onCountUpdate }) {
   const [challenges, setChallenges] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -45,6 +46,9 @@ export default function ChallengeInvitations({ onChallengeAccepted }) {
       if (!user) throw new Error('User not authenticated')
 
       console.log('Loading challenges for user:', user.id)
+
+      // First, clean up any expired challenges
+      await expireOldChallenges()
 
       // Get pending challenges with manual join to avoid foreign key issues
       const { data: lobbies, error: lobbiesError } = await supabase
@@ -90,6 +94,9 @@ export default function ChallengeInvitations({ onChallengeAccepted }) {
 
       console.log('Transformed challenges:', challengesWithUserData)
       setChallenges(challengesWithUserData)
+      
+      // Update parent component with challenge count
+      onCountUpdate?.(challengesWithUserData.length)
     } catch (err) {
       console.error('Error loading challenges:', err)
       setError(err.message)
@@ -304,6 +311,25 @@ export default function ChallengeInvitations({ onChallengeAccepted }) {
                         <span className="text-sm font-medium">Level {challenge.challenger_level}</span>
                         <span className="text-amber-400">•</span>
                         <span className="text-sm text-amber-600">{formatTimeAgo(challenge.created_at)}</span>
+                        <span className="text-amber-400">•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} className="text-amber-500" />
+                          <span className="text-xs text-amber-600">
+                            {(() => {
+                              const now = new Date()
+                              const challengeTime = new Date(challenge.created_at)
+                              const minutesElapsed = Math.floor((now - challengeTime) / (1000 * 60))
+                              const minutesRemaining = Math.max(0, 2 - minutesElapsed)
+                              if (minutesRemaining > 0) {
+                                return `${minutesRemaining}m left`
+                              } else {
+                                const secondsElapsed = Math.floor((now - challengeTime) / 1000)
+                                const secondsRemaining = Math.max(0, 120 - secondsElapsed)
+                                return secondsRemaining > 0 ? `${secondsRemaining}s left` : 'Expired'
+                              }
+                            })()}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-sm text-amber-700">
                         <span className="font-medium">{formatCategories(challenge.categories)}</span>

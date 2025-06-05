@@ -6,6 +6,8 @@ import Image from 'next/image'
 import { ArrowLeft, Trophy, Clock, User, Star, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
 import { getSupabase } from '@/utils/supabase'
 import { generateTriviaQuestions } from '@/utils/openai'
+import { awardChallengeXP } from '@/utils/levelingSystem'
+import LevelUpModal from '@/components/LevelUpModal'
 
 function FriendChallengeGameContent() {
   const router = useRouter()
@@ -29,6 +31,8 @@ function FriendChallengeGameContent() {
   const [isAnswered, setIsAnswered] = useState(false)
   const [userInput, setUserInput] = useState("")
   const [currentUserProfileImage, setCurrentUserProfileImage] = useState(null)
+  const [levelUpData, setLevelUpData] = useState(null)
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false)
   
   const pollIntervalRef = useRef(null)
 
@@ -685,6 +689,38 @@ function FriendChallengeGameContent() {
       setGameResults(results)
       setGameState('finished')
 
+      // Award XP for the challenge
+      try {
+        const playerScore = results.challenger_id === currentUserId 
+          ? results.challenger_score 
+          : results.challenged_score;
+        const opponentScore = results.challenger_id === currentUserId 
+          ? results.challenged_score 
+          : results.challenger_score;
+
+        const challengeData = {
+          playerScore,
+          opponentScore,
+          totalQuestions: results.total_questions,
+          difficulty: lobbyData?.difficulty || 'medium',
+          isWinner: results.winner_id === currentUserId,
+          isTie: results.is_tie,
+          playerAnswers: Object.values(myAnswers)
+        };
+
+        const xpResult = await awardChallengeXP(currentUserId, challengeData);
+        
+        if (xpResult.success && xpResult.data.leveledUp) {
+          // Show level up modal after a short delay
+          setTimeout(() => {
+            setLevelUpData(xpResult.data);
+            setShowLevelUpModal(true);
+          }, 2000); // 2 second delay to let results show first
+        }
+      } catch (xpError) {
+        console.error('Error awarding challenge XP:', xpError);
+      }
+
       // Update lobby status
       await supabase
         .from('game_lobbies')
@@ -1063,6 +1099,13 @@ function FriendChallengeGameContent() {
             </button>
           </div>
         )}
+
+        {/* Level Up Modal */}
+        <LevelUpModal
+          isOpen={showLevelUpModal}
+          onClose={() => setShowLevelUpModal(false)}
+          levelUpData={levelUpData}
+        />
       </div>
     </div>
   )
