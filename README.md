@@ -135,7 +135,6 @@ npm run lint
 - **JavaScript/JSX** - Primary programming language
 - **Jest** - Testing framework with comprehensive mocks
 - **ESLint** - Code linting and quality assurance
-- **PostCSS** - CSS processing and optimization
 
 ## 🎪 Usage
 
