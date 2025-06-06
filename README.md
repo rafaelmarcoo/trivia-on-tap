@@ -36,6 +36,83 @@ A modern, engaging web application that brings pub quiz excitement to your finge
 - Real-time game state updates
 - Accessible design patterns
 
+## 🚀 Installation & Setup
+
+### Prerequisites
+- **Node.js** (v18 or higher)
+- **npm** or **yarn** package manager
+- **Supabase** account and project
+- **OpenAI** API account and key
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/trivia-on-tap.git
+cd trivia-on-tap
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+# or
+yarn install
+```
+
+### 3. Environment Setup
+Create a `.env.local` file in the root directory:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
+```
+
+### 4. Supabase Setup
+1. Create a new Supabase project at [supabase.com](https://supabase.com)
+2. Set up the required database tables:
+   - `user` - User profiles and levels
+   - `game_sessions` - Game tracking
+   - `game_questions` - Question storage
+   - `game_lobbies` - Multiplayer lobbies
+   - `friend_requests` - Social features
+   - `messages` - Friend messaging
+3. Create a storage bucket named `profile-image` for user avatars
+4. Configure Row Level Security (RLS) policies for your tables
+
+### 5. Run the Application
+
+#### Development Mode
+```bash
+npm run dev
+# or
+yarn dev
+```
+Visit [http://localhost:3000](http://localhost:3000) to see the application.
+
+#### Production Build
+```bash
+npm run build
+npm run start
+# or
+yarn build
+yarn start
+```
+
+### 6. Additional Commands
+
+```bash
+# Run tests
+npm run test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate test coverage report
+npm run test:coverage
+
+# Lint code
+npm run lint
+```
+
 ## 🛠️ Tech Stack
 
 ### Frontend
